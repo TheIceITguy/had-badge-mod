@@ -1,0 +1,17 @@
+SAT$10:30 AM$TALK$Building a retro-PC From Components$Jeroen Domburg$domburg.png$No emulation. No ancient hardware. Designing a compact 486 SBC with modern amenities, starting from the silicon up.
+SAT$11:30 AM$TALK$Fluid Kernels and Optimizing C++$Federico Terraneo$terraneo.png$A tour of the fluid kernel architecture, Miosix RTOS, and 18 years of hard-won tips for writing efficient C++ on microcontrollers.
+SAT$12:00 PM$TALK$High Endurance Drones: Test, Fly, Survive$Suryansh Sharma$sharma.png$Come find out what it takes to build aerial robots that go beyond the lab.
+SAT$01:30 PM$TALK$Is Your Blood Pressure Monitor Lying?$Milos Rasic$rasic.png$An open source project developed to measure blood pressure, ECG, SpO2, and auscultations.
+SAT$02:00 PM$TALK$Space Oddities$Janelle Wellons$wellons.png$This talk will explore how ingenuity, creativity, and strong problem solving skills have saved missions from a premature end.
+SAT$03:00 PM$TALK$The 1-Bit CPU That Ran Factories$Nicola Cimmino$cimmino.png$Meet the Motorola MC14500B. A chip with no RAM, no stack, and a minimalist instruction set that replaced racks of relays.
+SAT$04:00 PM$TALK$Building Narrative Hardware$Katrin Dietzsch$dietzsch.png$See how hardware and firmware decisions can be used to create narrative experiences for tabletop role-playing games.
+SAT$04:30 PM$TALK$How to Get Teens Hacking Hardware$Alex Ren$ren.png$Alex shares the tools, culture, and community behind hardware hacking at scale for young makers.
+SAT$05:00 PM$TALK$Outdoor Adventures with Robots$Erin Kennedy$kennedy.png$Ten years of taking robots into the real outdoors, through sand, mud, and wildfire zones.
+SAT$06:00 PM$TALK$Bare Metal Made Easy$Sylvain Huet$huet.png$As tech grows more opaque, there is an urgent need to return to simple, hackable systems. Devices that blend into life rather than dominate it.
+SAT$08:00 PM$TALK$PlayStation 4 to Psychometer$Edwin Hwu$hwu.png$Turn a PlayStation 4 optical pickup into a high-speed dermal atomic force microscope.
+SAT$09:00 PM$TALK$Open Source Caving$Phil Underwood$underwood.png$In this talk Phil presents the work he has done over the last 20 years to develop electronic cave surveying tools.
+SUN$10:30 AM$TALK$Making Intuitive Electronic Instruments$Stephen Coyle$coyle.png$Exploring digital instruments that simulate physical intuitions about inertia, momentum, and gravity.
+SUN$11:00 AM$TALK$Introducing Project Gigapixel$Yannick Richter$richter.png$Covers the creation of a ultra high resolution portable camera using a 12-line CCD and Raspberry Pi 5. A reverse engineering odyssey.
+SUN$11:30 AM$TALK$Build a Cable Modem for your Arduino$Michael Wiebusch$wiebusch.png$Electric signals travel in two directions in a coaxial cable, and they dont mix on the way. Learn about transmission line theory and why it matters.
+SUN$01:00 PM$TALK$High Performance SDR on the Cheap$Anders Nielsen$nielsen.png$Building a low-cost 20MHz continuous bandwidth SDR capable of 3GHz using a single FPGA on a carrier board.
+SUN$02:00 PM$TALK$Lightning Talks$Random Hackers$wrencher.png$Short talks presented by Hackaday Europe attendees.

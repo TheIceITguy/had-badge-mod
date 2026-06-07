@@ -1,0 +1,29 @@
+# Upstream reference clone (kept locally, not part of this repo)
+/upstream/
+
+# Local agent/editor state
+/.claude/
+.vscode/
+.idea/
+
+# Python / tooling
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# MicroPython firmware images (large; flashed over USB, not version-controlled)
+*.bin
+
+# On-device runtime artifacts (generated on the badge, not source)
+firmware/badge/data/user_apps.py
+firmware/badge/data/config
+firmware/badge/data/*_private.der
+firmware/badge/data/track_*.csv
+firmware/badge/data/*-interests.csv
+
+# Local backups produced by scripts/update.py pull
+firmware/badge-backup/
