@@ -15,6 +15,8 @@ from core import core_settings
 from services.time_service import TimeService
 from services.gps_service import GpsService
 from services.battery_service import BatteryService
+from services.wifi_service import WifiService
+from services.web_service import WebService
 
 
 badge_obj = None  # Singleton reference for use in the python shell for debugging
@@ -80,6 +82,8 @@ class Badge:
         self.services.register(TimeService(self))
         self.services.register(GpsService(self))
         self.services.register(BatteryService(self))
+        self.services.register(WifiService(self))
+        self.services.register(WebService(self))  # must be after WifiService
 
         # Create task to run to check hardware, and update singleton reference
         self.task = aio.create_task(self.run())

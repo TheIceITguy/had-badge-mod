@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Badge config</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header>
+    <h1 id="devname">Badge</h1>
+    <div id="status" class="muted"></div>
+  </header>
+
+  <main>
+    <section>
+      <h2>Settings</h2>
+      <div id="settings"></div>
+      <button id="save">Save settings</button>
+      <button id="applywifi">Save &amp; apply WiFi</button>
+      <span id="savemsg" class="muted"></span>
+    </section>
+
+    <section>
+      <h2>Mesh nodes</h2>
+      <button id="refreshnodes">Refresh</button>
+      <table id="nodes"><thead><tr><th>Node</th><th>Name</th><th>Lat</th><th>Lon</th><th>SNR</th></tr></thead><tbody></tbody></table>
+    </section>
+
+    <section>
+      <h2>Update firmware (.py only)</h2>
+      <p class="muted">Upload a .py file to <code>apps/&lt;name&gt;.py</code> or the root, then reboot.</p>
+      <input id="uppath" placeholder="apps/my_app.py">
+      <input id="upfile" type="file" accept=".py">
+      <button id="upload">Upload</button>
+      <button id="reboot">Reboot</button>
+      <span id="upmsg" class="muted"></span>
+    </section>
+  </main>
+
+  <footer class="muted">
+    <a id="repo" href="#" target="_blank">project repo</a> · <span id="version"></span>
+  </footer>
+  <script src="/app.js"></script>
+</body>
+</html>
