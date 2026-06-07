@@ -4,9 +4,15 @@ lcd_color_bg      = lvgl.color_hex(0xabc5a0)
 lcd_color_fg      = lvgl.color_hex(0x292b29)
 lcd_color_fg_dark = lvgl.color_hex(0x080908)
 
-hackaday_grey   = lvgl.color_hex(0x1a1a1a)
-hackaday_yellow = lvgl.color_hex(0xe39810) ## adjusted for screen gamma
-hackaday_white  = lvgl.color_hex(0xffffff)
+# Neutral theme colors (de-branded). The accent is a warm amber tuned for the LCD.
+accent   = lvgl.color_hex(0xe39810)
+bg_dark  = lvgl.color_hex(0x1a1a1a)
+fg_white = lvgl.color_hex(0xffffff)
+
+# Backwards-compatibility aliases for apps that referenced the old brand names.
+hackaday_grey   = bg_dark
+hackaday_yellow = accent
+hackaday_white  = fg_white
 
 base_style = lvgl.style_t()
 base_style.init()

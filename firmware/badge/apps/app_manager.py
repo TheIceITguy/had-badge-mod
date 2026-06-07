@@ -6,6 +6,7 @@ import sys
 from ui import graphics
 from ui.page import Page
 from apps.base_app import BaseApp
+from core import about
 
 # For logo random
 import random
@@ -113,7 +114,7 @@ class AppManager(BaseApp):
 
     def add_message(self, message):
         self.welcome = lvgl.label(self.page.content)
-        self.welcome.align(lvgl.ALIGN.TOP_LEFT, 120, 20)
+        self.welcome.align(lvgl.ALIGN.TOP_LEFT, 8, 8)
         self.welcome.set_style_text_font(lvgl.font_montserrat_16, 0)
         self.welcome.set_text(message)
 
@@ -123,11 +124,8 @@ class AppManager(BaseApp):
         self.page = Page()
         self.page.create_content()
 
-        # Load random logo
-        self.add_logo("images/logos/" + str(random.randrange(1, 102)) + ".png")
-
-        # Header message
-        self.add_message("2026 Hackaday Europe\nLecco, IT")
+        # Neutral header (no event branding).
+        self.add_message("Apps\n%s" % about.REPO_SHORT)
         self.page.create_menubar(self.name_list)
         self.page.replace_screen()
 

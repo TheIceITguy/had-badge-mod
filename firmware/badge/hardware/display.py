@@ -19,7 +19,7 @@ class Display:
         self.max_height = 142
         self.CHAR_HEIGHT = 12
         self.CHAR_WIDTH = 12
-        self.screen.set_style_bg_color(styles.hackaday_grey, 0)
+        self.screen.set_style_bg_color(styles.bg_dark, 0)
         print("Display initialized")
 
     @property
@@ -28,12 +28,12 @@ class Display:
 
     def _fn_label(self, text: str, y: int, color=None):
         if color is None:
-            color = styles.hackaday_yellow
+            color = styles.accent
         label = lvgl.label(self.screen)
         label.set_text(text)
         label.set_style_text_color(color, 0)
         label.set_style_text_font(lvgl.font_montserrat_16, 0)
-        label.set_style_bg_color(styles.hackaday_grey, 0)
+        label.set_style_bg_color(styles.bg_dark, 0)
         label.set_style_text_color(color, 0)
         label.align(lvgl.ALIGN.BOTTOM_LEFT, int(y), 0)
 

@@ -5,10 +5,7 @@ from ui import styles
 from ui import graphics
 from ui.page import Page
 from apps.base_app import BaseApp
-# from ui.pages import Splashscreen
-
-# For logo random
-import random
+from core import about
 
 class AppMenu(BaseApp):
     def __init__(self, name: str, badge, apps: list[BaseApp | None], main: bool):
@@ -35,7 +32,7 @@ class AppMenu(BaseApp):
 
     def add_message(self, message):
         self.welcome = lvgl.label(self.page.content)
-        self.welcome.align(lvgl.ALIGN.TOP_LEFT, 120, 20)
+        self.welcome.align(lvgl.ALIGN.TOP_LEFT, 8, 8)
         self.welcome.set_style_text_font(lvgl.font_montserrat_16, 0)
         self.welcome.set_text(message)
 
@@ -45,11 +42,9 @@ class AppMenu(BaseApp):
         self.page = Page()
         self.page.create_content()
 
-        # Load random logo
-        self.add_logo("images/logos/" + str(random.randrange(1, 102)) + ".png")
-
-        # Header message
-        self.add_message("2026 Hackaday Europe\nLecco, IT")
+        # Neutral home screen: device name + project + repo (no event branding).
+        self.add_message("%s\n%s\n%s" % (
+            self.badge.device_name(), about.PROJECT_NAME, about.REPO_SHORT))
         self.page.create_menubar(self.name_list)
         self.page.replace_screen()
 

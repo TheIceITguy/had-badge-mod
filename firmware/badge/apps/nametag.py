@@ -42,7 +42,7 @@ class App(BaseApp):
         try:
             self.image_path = self.badge.config.get("nametag_image").decode().strip()
         except Exception:
-            self.image_path = "images/headshots/wrencher.png"
+            self.image_path = ""
         self.font = (
             lvgl.font_montserrat_42
         )  ## LVGL font object -- get more below or define your own
@@ -432,7 +432,7 @@ class App(BaseApp):
         try:
             self.image_path = self.badge.config.get("nametag_image").decode().strip()
         except Exception:
-            self.image_path = "images/headshots/wrencher.png"
+            self.image_path = ""
         self.p.create_infobar([f"Hello, My Name Is: {self.username}", "Nametag App"])
         self.p.create_content()
         self.p.create_menubar(["Name", "Pick Img", "Fullscreen", "", "Home"])

@@ -92,8 +92,8 @@ heap with LVGL up.
 | M4 | Meshtastic backend live (interop) | ✅ |
 | M5 | GPS + time service | ✅ |
 | M6 | Position sharing + node DB + node map | ✅ |
-| M-Name | Device name as single source of truth | ⏳ |
-| M-Brand | De-brand + repo links | ⏳ |
+| M-Name | Device name as single source of truth | ✅ |
+| M-Brand | De-brand + repo links | ✅ |
 | M7 | WiFi + WebUI (`.py` updates) | ⏳ |
 | M8 | Paged launcher + settings app + app SDK | ⏳ |
 | M9 | Power management + battery % on all screens | ⏳ |

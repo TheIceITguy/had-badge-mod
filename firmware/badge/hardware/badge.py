@@ -40,8 +40,8 @@ class Badge:
         if "nametag_show_image" not in self.config.db.keys():
             self.config.set("nametag_show_image", b'false')
         if "nametag_image" not in self.config.db.keys():
-            # Store a reasonable default; user can replace this file or change the path
-            self.config.set("nametag_image", b'images/headshots/wrencher.png')
+            # No default avatar (de-branded); user can pick one in the Nametag app.
+            self.config.set("nametag_image", b'')
         if "radio_tx_power" not in self.config.db.keys():
             self.config.set("radio_tx_power", b'9')
         if "chat_ttl" not in self.config.db.keys():
