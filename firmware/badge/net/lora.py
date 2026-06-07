@@ -152,3 +152,42 @@ class LoraRadio:
         self.freq_slot = slot
         self.frequency = freq_mhz
         return self.frequency
+
+    def reconfigure(self, freq=None, bw=None, sf=None, cr=None, sync=None,
+                    preamble=None, power=None):
+        """Re-apply LoRa modem parameters at runtime (e.g. switching between the
+        BadgeNet and Meshtastic stacks).
+
+        Call only when the radio is idle: the network backend stops its RX/TX
+        tasks before switching. Goes to standby, applies the given parameters,
+        then re-arms IRQ-driven receive (the DIO1 action set during init persists
+        across standby). Returns True if applied, False if the radio is absent.
+        """
+        if self.radio is None:
+            return False
+        self.radio.standby()
+        if bw is not None:
+            self.radio.setBandwidth(bw)
+            self.bandwidth = bw
+        if sf is not None:
+            self.radio.setSpreadingFactor(sf)
+            self.spreading_factor = sf
+        if cr is not None:
+            self.radio.setCodingRate(cr)
+            self.coding_rate = cr
+        if sync is not None:
+            self.radio.setSyncWord(sync)
+            self.sync_word = sync
+        if preamble is not None:
+            self.radio.setPreambleLength(preamble)
+            self.preamble_length = preamble
+        if freq is not None:
+            self.radio.setFrequency(freq)
+            self.frequency = freq
+        if power is not None:
+            self.radio.setOutputPower(power)
+            self.tx_power = power
+        # Re-arm receive (RF switch to RX, restart the receiver).
+        self._rf_sw_rx()
+        self.radio.startReceive()
+        return True

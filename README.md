@@ -88,7 +88,7 @@ heap with LVGL up.
 | M0 | Bootstrap repo + scaffold | ✅ |
 | M1 | Meshtastic codec + crypto (host-tested) | ✅ |
 | M2 | Core OS layer (services, events, settings, manifest) | ✅ |
-| M3 | Network backend abstraction + BadgeNet adapter | ⏳ |
+| M3 | Network backend abstraction + BadgeNet adapter | ✅ |
 | M4 | Meshtastic backend live (interop) | ⏳ |
 | M5 | GPS + time service | ⏳ |
 | M6 | Position sharing + node DB + node map | ⏳ |

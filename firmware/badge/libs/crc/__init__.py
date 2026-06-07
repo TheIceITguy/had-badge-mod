@@ -224,7 +224,7 @@ class Calculator:
         if tab:
             self._tab = tab                                   # needs to be checked for typecode, length !!!!
         else:
-            self._tab = array(tab_tc, 0 for _ in range(256))  # create lookup table 
+            self._tab = array(tab_tc, [0] * 256)  # create lookup table (filled below)
 
         rpoly = self._rbit(poly)                              # and fill it, depending on input reflection
         for i in range(256):

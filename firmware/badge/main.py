@@ -5,6 +5,8 @@ import asyncio as aio  # type: ignore
 try:
     from hardware.badge import Badge
     from net.net import badgenet, capture_all_packets
+    from net.backend import MessageRouter
+    from net.backend_badgenet import BadgeNetBackend
     from apps import app_manager, app_menu, chat, config_manager, usb_debug, nametag, talks
 except Exception as ex:
     # If anything goes wrong at import time, wait a second and print it
@@ -21,6 +23,16 @@ async def main():
     print("Initializing main...")
     badge = Badge()
     badgenet.init(badge)
+
+    # Backend-agnostic messaging layer. The router owns whichever LoRa stack is
+    # active (one at a time). BadgeNet is registered here; the Meshtastic backend
+    # registers itself in a later milestone and may become the default.
+    net_router = MessageRouter(badge)
+    net_router.register_backend(BadgeNetBackend(badge))
+    badge.services.register(net_router)
+    badge.net_router = net_router
+    net_router.set_backend(badge.settings.get("net_backend", "badgenet"))
+
     user_app_manager = app_manager.AppManager("Apps", badge)
     # These apps are on the main screen when the badge boots
     primary_apps = [
