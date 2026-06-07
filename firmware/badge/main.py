@@ -8,6 +8,7 @@ try:
     from net.backend import MessageRouter
     from net.backend_badgenet import BadgeNetBackend
     from net.mesh.backend_meshtastic import MeshtasticBackend
+    from services.mesh_service import MeshService
     from apps import app_manager, app_menu, chat, config_manager, usb_debug, nametag, talks, msg_app
 except Exception as ex:
     # If anything goes wrong at import time, wait a second and print it
@@ -35,6 +36,11 @@ async def main():
     badge.net_router = net_router
     # Meshtastic is the default stack (true interop); switchable in settings.
     net_router.set_backend(badge.settings.get("net_backend", "meshtastic"))
+
+    # Mesh node database + periodic NodeInfo/position beacon.
+    mesh_service = MeshService(badge)
+    badge.services.register(mesh_service)
+    mesh_service.start()
 
     user_app_manager = app_manager.AppManager("Apps", badge)
     # These apps are on the main screen when the badge boots
