@@ -86,7 +86,7 @@ heap with LVGL up.
 | Milestone | Scope | State |
 |-----------|-------|-------|
 | M0 | Bootstrap repo + scaffold | ✅ |
-| M1 | Meshtastic codec + crypto (host-tested) | ⏳ |
+| M1 | Meshtastic codec + crypto (host-tested) | ✅ |
 | M2 | Core OS layer (services, events, settings, manifest) | ⏳ |
 | M3 | Network backend abstraction + BadgeNet adapter | ⏳ |
 | M4 | Meshtastic backend live (interop) | ⏳ |
