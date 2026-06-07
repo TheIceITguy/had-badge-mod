@@ -44,13 +44,25 @@ The firmware is MicroPython; you sync the `firmware/badge/` tree onto a badge th
 already flashed with the `lvgl_micropython` image. From `firmware/`:
 
 ```bash
-python -m venv venv && source venv/bin/activate    # (Windows: venv/Scripts/activate)
+python -m venv venv && source venv/bin/activate    # (Windows: venv\Scripts\activate)
 pip install -r requirements.txt                     # mpremote, etc.
 
-# Copy everything to the badge and reset it
+# Copy everything to the badge and reset it (bash expands the glob):
 mpremote cp -r badge/* :
-# or, selective sync that also deletes removed files:
-scripts/update.py --reset push
+# Selective sync that also deletes removed files:
+python scripts/update.py push --reset
+```
+
+**Windows / PowerShell:** PowerShell does not expand `badge/*`, so `mpremote cp -r badge/* :`
+fails with `cp: Invalid argument`. Use one of:
+
+```powershell
+# Expand the glob in PowerShell and copy each top-level item to the badge root:
+Get-ChildItem badge | ForEach-Object { mpremote cp -r $_.FullName : }
+
+# Or the helper (set the port if auto-detect fails; find it with `mpremote devs`):
+$env:MPREMOTE_PORT = "COM5"        # omit to auto-detect a single board
+python scripts/update.py push --reset
 ```
 
 The full `lvgl_micropython` `.bin` is flashed over USB with `esptool`/`mpremote`
