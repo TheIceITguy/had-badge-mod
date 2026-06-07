@@ -35,3 +35,9 @@ SAO_SCL = Pin(5)
 SAO_SDA = Pin(4)
 SAO_GPIO1 = Pin(7)
 SAO_GPIO2 = Pin(6)
+
+# Expansion header J6: VCC(3V3), IO11, IO12, GND. Used for the ATGM336H GPS (UART).
+# Wire the GPS module's TX to IO12 (ESP32 RX) and its RX to IO11 (ESP32 TX).
+# Both are overridable via settings (gps_tx_pin / gps_rx_pin).
+GPS_TX_PIN = 11  # ESP32 TX  -> GPS RX (optional; only needed to send GPS config)
+GPS_RX_PIN = 12  # ESP32 RX  <- GPS TX (NMEA stream in)

@@ -12,6 +12,8 @@ from core.events import EventBus
 from core.services import ServiceRegistry
 from core.settings import SettingsRegistry
 from core import core_settings
+from services.time_service import TimeService
+from services.gps_service import GpsService
 
 
 badge_obj = None  # Singleton reference for use in the python shell for debugging
@@ -72,6 +74,10 @@ class Badge:
         self.settings = SettingsRegistry(self.config)
         core_settings.register_core_settings(self.settings)
         self.node_id = core_settings.node_id()
+
+        # Register services (started by start_all() once the loop is running).
+        self.services.register(TimeService(self))
+        self.services.register(GpsService(self))
 
         # Create task to run to check hardware, and update singleton reference
         self.task = aio.create_task(self.run())
