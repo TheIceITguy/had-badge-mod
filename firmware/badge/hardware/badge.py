@@ -8,6 +8,11 @@ from hardware.keyboard import Keyboard
 from net.lora import LoraRadio
 from net.crypto import Crypto
 
+from core.events import EventBus
+from core.services import ServiceRegistry
+from core.settings import SettingsRegistry
+from core import core_settings
+
 
 badge_obj = None  # Singleton reference for use in the python shell for debugging
 
@@ -61,8 +66,23 @@ class Badge:
 
         self.crypto = Crypto()
 
+        # --- Core OS layer: event bus, service registry, settings schema ---
+        self.events = EventBus()
+        self.services = ServiceRegistry(self)
+        self.settings = SettingsRegistry(self.config)
+        core_settings.register_core_settings(self.settings)
+        self.node_id = core_settings.node_id()
+
         # Create task to run to check hardware, and update singleton reference
         self.task = aio.create_task(self.run())
+
+        # Start any registered services now that the event loop is running.
+        # (Feature milestones register their services above before this point.)
+        self.services.start_all()
+
+    def device_name(self):
+        """The badge's name (Meshtastic long name / WiFi SSID / chat alias)."""
+        return self.settings.get("device_name")
 
     async def run(self):
         print("Running badge task...")
