@@ -9,7 +9,7 @@ try:
     from net.backend_badgenet import BadgeNetBackend
     from net.mesh.backend_meshtastic import MeshtasticBackend
     from services.mesh_service import MeshService
-    from apps import app_manager, app_menu, chat, config_manager, usb_debug, nametag, talks, msg_app
+    from apps import app_manager, app_menu, chat, config_manager, usb_debug, nametag, talks, msg_app, settings_app
 except Exception as ex:
     # If anything goes wrong at import time, wait a second and print it
     # Sometimes these are hard to see, so the delay and extra print may help
@@ -51,7 +51,8 @@ async def main():
         talks.Talks("Talks", badge),
         nametag.App("Nametag", badge),
         user_app_manager,
-        config_manager.ConfigManager("Config", badge),
+        # Schema-driven settings page (manage WiFi/GPS/region/backend/power/name).
+        settings_app.App("Config", badge),
     ]
     # These apps aren't listed in the menus, so put them here to get started below
     backgrounded_apps = [

@@ -23,6 +23,7 @@ APPMOD_DENYLIST = {
     "msg_app",
     "nametag",
     "net_tools",
+    "settings_app",
     "talks",
     "template_app",
     "usb_debug",
