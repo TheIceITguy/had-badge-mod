@@ -96,7 +96,7 @@ heap with LVGL up.
 | M-Brand | De-brand + repo links | ✅ |
 | M7 | WiFi + WebUI (`.py` updates) | ⏳ |
 | M8 | Paged launcher + settings app + app SDK | ⏳ |
-| M9 | Power management + battery % on all screens | ⏳ |
+| M9 | Power management + battery % on all screens | ✅ |
 
 ## Credits & license
 

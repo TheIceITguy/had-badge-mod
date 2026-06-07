@@ -163,6 +163,9 @@ class Keyboard:
         the keybuffer and state of special keys.
         """
         new_events = await self.mux.read_events()
+        if new_events:
+            # Coarse activity signal for power management (backlight dimming).
+            self.activity_count = getattr(self, "activity_count", 0) + 1
         for event in new_events:
             # Event is (pressed(1)/released(0), key index)
             # Check modifier keys
