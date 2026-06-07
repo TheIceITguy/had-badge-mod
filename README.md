@@ -89,7 +89,7 @@ heap with LVGL up.
 | M1 | Meshtastic codec + crypto (host-tested) | ✅ |
 | M2 | Core OS layer (services, events, settings, manifest) | ✅ |
 | M3 | Network backend abstraction + BadgeNet adapter | ✅ |
-| M4 | Meshtastic backend live (interop) | ⏳ |
+| M4 | Meshtastic backend live (interop) | ✅ |
 | M5 | GPS + time service | ⏳ |
 | M6 | Position sharing + node DB + node map | ⏳ |
 | M-Name | Device name as single source of truth | ⏳ |

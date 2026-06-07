@@ -7,7 +7,8 @@ try:
     from net.net import badgenet, capture_all_packets
     from net.backend import MessageRouter
     from net.backend_badgenet import BadgeNetBackend
-    from apps import app_manager, app_menu, chat, config_manager, usb_debug, nametag, talks
+    from net.mesh.backend_meshtastic import MeshtasticBackend
+    from apps import app_manager, app_menu, chat, config_manager, usb_debug, nametag, talks, msg_app
 except Exception as ex:
     # If anything goes wrong at import time, wait a second and print it
     # Sometimes these are hard to see, so the delay and extra print may help
@@ -29,14 +30,18 @@ async def main():
     # registers itself in a later milestone and may become the default.
     net_router = MessageRouter(badge)
     net_router.register_backend(BadgeNetBackend(badge))
+    net_router.register_backend(MeshtasticBackend(badge))
     badge.services.register(net_router)
     badge.net_router = net_router
-    net_router.set_backend(badge.settings.get("net_backend", "badgenet"))
+    # Meshtastic is the default stack (true interop); switchable in settings.
+    net_router.set_backend(badge.settings.get("net_backend", "meshtastic"))
 
     user_app_manager = app_manager.AppManager("Apps", badge)
     # These apps are on the main screen when the badge boots
     primary_apps = [
-        chat.ChatApp("Chat", badge),
+        # Messages is the backend-agnostic communicator (Meshtastic or BadgeNet).
+        # It supersedes the BadgeNet-only stock Chat app on the home screen.
+        msg_app.App("Messages", badge),
         talks.Talks("Talks", badge),
         nametag.App("Nametag", badge),
         user_app_manager,

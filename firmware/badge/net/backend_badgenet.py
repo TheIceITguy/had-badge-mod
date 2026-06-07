@@ -6,7 +6,7 @@ are not part of BadgeNet, so those sends are no-ops here (use the Meshtastic
 backend for position sharing).
 """
 from net.backend import NetBackend, Message, BROADCAST, KIND_TEXT
-from net.net import MY_ADDRESS, register_receiver, send
+from net.net import MY_ADDRESS, register_receiver, send, badgenet
 from net.protocols import NetworkFrame, Protocol
 
 MAX_MESSAGE_LEN = 100
@@ -71,13 +71,19 @@ class BadgeNetBackend(NetBackend):
     def activate(self):
         if hasattr(self.badge.lora, "reconfigure"):
             self.badge.lora.reconfigure(**self._params)
+        # Ensure the BadgeNet RX/TX tasks are running (a previous Meshtastic
+        # session may have stopped them).
+        try:
+            badgenet.start_tasks()
+        except Exception:  # noqa: BLE001
+            pass
         if not self._registered:
             register_receiver(TEXT_CHAT, self._on_text)
             self._registered = True
 
     def deactivate(self):
         # BadgeNet's recv/tx tasks belong to the global badgenet singleton; the
-        # Meshtastic backend pauses them on activate(). Nothing to do here.
+        # Meshtastic backend stops them on activate(). Nothing to do here.
         pass
 
     def _on_text(self, frame):

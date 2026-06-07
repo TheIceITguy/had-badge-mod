@@ -19,6 +19,7 @@ APPMOD_DENYLIST = {
     "chat",
     "config_manager",
     "demo",
+    "msg_app",
     "nametag",
     "net_tools",
     "talks",

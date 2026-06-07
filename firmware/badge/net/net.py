@@ -42,15 +42,37 @@ class BadgeNet:
         self.lora_tx_task: aio.Task
         self.send_cooldown_s: float = 0.001
         self.flush_recently_seen_cache_task: aio.Task
+        # Whether the BadgeNet RX/TX tasks are running. The Meshtastic backend
+        # pauses BadgeNet (single radio = one stack consuming lora.recv() at a time).
+        self.running = False
 
     def init(self, badge):
         self.badge = badge
         self.send_cooldown_s = self.badge.send_cooldown_ms / 1000
+        self.start_tasks()
+
+    def start_tasks(self):
+        """Start (or restart) the BadgeNet RX/TX/cache tasks."""
+        if self.running:
+            return
         self.lora_rx_task = aio.create_task(self.recv_all())
         self.lora_tx_task = aio.create_task(self.send_all())
         self.flush_recently_seen_cache_task = aio.create_task(
             self.flush_recently_seen()
         )
+        self.running = True
+
+    def stop(self):
+        """Cancel the BadgeNet tasks so another stack can own the radio."""
+        if not self.running:
+            return
+        for task in (self.lora_rx_task, self.lora_tx_task,
+                     self.flush_recently_seen_cache_task):
+            try:
+                task.cancel()
+            except Exception:  # noqa: BLE001
+                pass
+        self.running = False
 
     def register_protocol(self, protocol: Protocol):
         """Register a protocol to be known by the network stack for debug decoding.
