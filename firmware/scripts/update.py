@@ -14,7 +14,9 @@ from typing import Iterable
 # mpremote port. Set the MPREMOTE_PORT env var (e.g. COM5 on Windows, or a
 # shorthand like a0/c0). Empty = let mpremote auto-detect the only attached board.
 port = os.environ.get("MPREMOTE_PORT", "")
-_MP = ["mpremote"] + ([port] if port else [])
+# mpremote needs "connect <port>" for explicit ports like COM12 (a bare "COM12"
+# is not a command; only shorthands like c12/a0 work bare). Empty = auto-detect.
+_MP = ["mpremote"] + (["connect", port] if port else [])
 
 def check_path(path: str, ) -> dict[str, bytes]:
     files: dict[str, bytes] = {}
