@@ -31,6 +31,20 @@ def probe():
     except Exception as e:  # noqa: BLE001
         _line("network (WiFi):", "MISSING (%s)" % e)
 
+    # --- Bluetooth LE (for Drone Remote ID over BLE) ---------------------
+    try:
+        import bluetooth
+
+        ble = bluetooth.BLE()
+        ble.active(True)
+        _line("bluetooth (BLE):", "PRESENT, gap_scan=%s" % hasattr(ble, "gap_scan"))
+        try:
+            ble.active(False)
+        except Exception:  # noqa: BLE001
+            pass
+    except Exception as e:  # noqa: BLE001
+        _line("bluetooth (BLE):", "MISSING (%s)" % e)
+
     # --- AES-CTR via cryptography (ucryptography) -------------------------
     aes_ctr = "MISSING"
     try:

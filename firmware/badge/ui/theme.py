@@ -37,9 +37,15 @@ SCREEN_W, SCREEN_H = 428, 142
 SIDEBAR_W = 28
 CONTENT_X = SIDEBAR_W
 CONTENT_W = SCREEN_W - SIDEBAR_W      # 400
-HEADER_H, FOOTER_H = 22, 22
-BODY_H = SCREEN_H - HEADER_H - FOOTER_H   # 98
+HEADER_H = 20
+FOOTER_H = 14                         # thin function-key label bar
+INPUT_H = 20                          # taller footer when it holds a text input
+BODY_H = SCREEN_H - HEADER_H - FOOTER_H
 CONTENT_PAD = PAD_M
+
+# Flat, modern per-tile colors for the launcher (no gradients, no letters).
+APP_COLORS = [0xE39810, 0x35C46A, 0x3FC7E0, 0xF2B01E, 0x4F8DF5, 0xB07CF0,
+              0xE5648A, 0x6FD08C]
 
 
 # --- FONT ACCESSORS (lazy; pure helpers never call these) ------------------
@@ -66,6 +72,12 @@ def f_hero():
 def f_giant():
     import lvgl
     return lvgl.font_montserrat_42
+
+
+def f_term():
+    """Old-school fixed-width terminal font (unscii 8px) for the footer/HUD."""
+    import lvgl
+    return lvgl.font_unscii_8
 
 
 # --- PURE STATE -> VISUAL MAPPERS (host-testable) --------------------------

@@ -39,18 +39,35 @@ class BaseApp:
         gc.collect()
 
     async def run(self):
-        """Run the app's main loop."""
+        """Run the app's main loop.
+
+        Each tick is wrapped so a single error (e.g. an unbound LVGL call) prints a
+        traceback and drops the app to the background instead of silently killing
+        its task. The launcher then re-foregrounds itself, keeping the badge usable.
+        """
         while True:
-            if self.active_foreground:
-                self.run_foreground()
-                await aio.sleep_ms(self.foreground_sleep_ms)
-                if self.badge.check_background_current_app():
-                    self.switch_to_background()
-            elif self.active_background:
-                self.run_background()
-                await aio.sleep_ms(self.background_sleep_ms)
-            else:
-                self.stop()
+            try:
+                if self.active_foreground:
+                    self.run_foreground()
+                    await aio.sleep_ms(self.foreground_sleep_ms)
+                    if self.badge.check_background_current_app():
+                        self.switch_to_background()
+                elif self.active_background:
+                    self.run_background()
+                    await aio.sleep_ms(self.background_sleep_ms)
+                else:
+                    self.stop()
+            except Exception as exc:  # noqa: BLE001
+                import sys
+                print("App '%s' run error:" % self.name)
+                if hasattr(sys, "print_exception"):
+                    sys.print_exception(exc)
+                else:
+                    print(exc)
+                # Recover to background so the launcher takes over (don't spin).
+                self.active_foreground = False
+                self.active_background = True
+                await aio.sleep_ms(300)
 
     def run_foreground(self):
         """App behavior when running in the foreground."""
