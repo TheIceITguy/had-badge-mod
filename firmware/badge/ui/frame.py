@@ -70,39 +70,46 @@ class Frame:
         b.set_style_pad_bottom(theme.PAD_S, 0)
         return b
 
-    # --- footer: F-key hint bar ----------------------------------------
+    # --- footer: function-key label bar --------------------------------
+    # PROJECT RULE: footer text is ALWAYS theme.C_TEXT (one fixed, readable color),
+    # never color-coded per state. The bar is transparent; labels show the action
+    # name only (no "F1".."F5"). Position = which physical button.
     def make_menubar(self, labels):
         self.footer = lvgl.obj(self.col)
         self.footer.set_size(theme.CONTENT_W, theme.FOOTER_H)
         self.footer.set_scrollbar_mode(0)
-        self.footer.add_style(theme.st_footer, 0)
+        self.footer.set_style_bg_opa(0, 0)        # transparent
+        self.footer.set_style_border_width(0, 0)
+        self.footer.set_style_pad_all(0, 0)
         self._menu_labels = []
         cell = theme.CONTENT_W // 5
         for i in range(5):
             lbl = lvgl.label(self.footer)
-            lbl.set_style_text_font(theme.f_tiny(), 0)
-            txt = labels[i] if i < len(labels) else ""
-            lbl.set_style_text_color(_hx(theme.C_ACCENT if txt else theme.C_TEXT_MUTE), 0)
-            lbl.set_text(("F%d %s" % (i + 1, txt)) if txt else "")
-            lbl.align(lvgl.ALIGN.LEFT_MID, i * cell + 2, 0)
+            lbl.set_style_text_font(theme.f_term(), 0)
+            lbl.set_style_text_color(_hx(theme.C_TEXT), 0)
+            lbl.set_style_text_align(lvgl.ALIGN.CENTER, 0)
+            lbl.set_width(cell)
+            lbl.set_text(labels[i] if i < len(labels) else "")
+            lbl.align(lvgl.ALIGN.LEFT_MID, i * cell, 0)
             self._menu_labels.append(lbl)
         return self.footer
 
     def set_menu_label(self, i, text):
-        lbl = self._menu_labels[i]
-        lbl.set_text(("F%d %s" % (i + 1, text)) if text else "")
-        lbl.set_style_text_color(_hx(theme.C_ACCENT if text else theme.C_TEXT_MUTE), 0)
+        self._menu_labels[i].set_text(text or "")
 
     # --- footer: always-on text input ----------------------------------
     def make_input(self, placeholder="Message"):
         self.footer = lvgl.obj(self.col)
-        self.footer.set_size(theme.CONTENT_W, theme.FOOTER_H)
+        self.footer.set_size(theme.CONTENT_W, theme.INPUT_H)
         self.footer.set_scrollbar_mode(0)
-        self.footer.add_style(theme.st_footer, 0)
+        self.footer.set_style_bg_opa(0, 0)        # transparent; the pill has its own bg
+        self.footer.set_style_border_width(0, 0)
+        self.footer.set_style_pad_all(0, 0)
         self.input = lvgl.textarea(self.footer)
         self.input.set_one_line(True)
         self.input.add_style(theme.st_input, 0)
-        self.input.set_size(theme.CONTENT_W - 2 * theme.PAD_M, theme.FOOTER_H - 4)
+        self.input.set_style_text_font(theme.f_body(), 0)
+        self.input.set_size(theme.CONTENT_W - 2 * theme.PAD_M, theme.INPUT_H - 2)
         self.input.align(lvgl.ALIGN.CENTER, 0, 0)
         self.input.set_style_border_color(_hx(theme.C_ACCENT),
                                           lvgl.PART.CURSOR | lvgl.STATE.FOCUSED)

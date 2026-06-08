@@ -21,6 +21,7 @@ EV_BATTERY = "battery"                      # dict(volts, pct, charging)
 EV_BATTERY_LOW = "battery_low"             # dict(pct)
 EV_TIME_SYNC = "time_sync"                  # epoch seconds (int)
 EV_BACKEND_CHANGED = "backend_changed"      # backend name (str)
+EV_MESSAGES_READ = "messages_read"          # Messages app viewed -> clear notify
 EV_KEY = "key"                              # str (one key) - opt-in
 
 

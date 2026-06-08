@@ -137,7 +137,7 @@ class App(BaseApp):
     def switch_to_foreground(self):
         super().switch_to_foreground()
         self.fr = Frame("Settings", "")
-        self.fr.make_menubar(["Edit", "", "Up", "Down", "Back"])
+        self.fr.make_menubar(["Edit", "", "", "", "Back"])
         self._show_categories()
         self.fr.replace_screen()
 

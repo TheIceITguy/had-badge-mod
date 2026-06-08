@@ -12,14 +12,14 @@ import lvgl
 from apps.base_app import BaseApp
 from ui.frame import Frame
 from ui import theme
-from core.events import EV_MESSAGE_RECEIVED, EV_BACKEND_CHANGED
+from core.events import EV_MESSAGE_RECEIVED, EV_BACKEND_CHANGED, EV_MESSAGES_READ
 from net.backend import KIND_TEXT
 
 APP_NAME = "Messages"
 
 MAX_MESSAGE_LEN = 200
 BUFFER_LEN = 100
-BUBBLE_MAXW = 250
+BUBBLE_W = 250
 _hx = lvgl.color_hex
 
 
@@ -72,19 +72,27 @@ class App(BaseApp):
         router = self.badge.services.get("net") if hasattr(self.badge, "services") else None
         return router.active_name if router else "?"
 
+    def _add_sender(self, name):
+        lab = lvgl.label(self.fr.body)
+        lab.set_style_text_font(theme.f_tiny(), 0)
+        lab.set_style_text_color(_hx(theme.C_TEXT_DIM), 0)
+        lab.set_text(name)
+        lab.set_pos(0, self._y)
+        self._y += 13
+        self._bubbles.append(lab)
+
     def _add_bubble(self, mine, text):
         body = self.fr.body
         lbl = lvgl.label(body)
         lbl.add_style(theme.st_bubble_me if mine else theme.st_bubble_them, 0)
+        lbl.set_width(BUBBLE_W)        # fixed -> wraps + auto-height, no measuring
         lbl.set_text(text)
         body.update_layout()
-        if lbl.get_width() > BUBBLE_MAXW:
-            lbl.set_width(BUBBLE_MAXW)
-            body.update_layout()
-        w = lbl.get_width()
         h = lbl.get_height()
+        if not h or h < 10:
+            h = 16
         inner = theme.CONTENT_W - 2 * theme.PAD_M
-        lbl.set_pos((inner - w) if mine else 0, self._y)
+        lbl.set_pos((inner - BUBBLE_W) if mine else 0, self._y)
         self._y += h + 4
         self._bubbles.append(lbl)
 
@@ -100,6 +108,8 @@ class App(BaseApp):
     def _render(self):
         if self.fr is None:
             return
+        # We're showing the chat -> clear the sidebar unread indicator.
+        self.badge.events.publish(EV_MESSAGES_READ, None)
         self._clear_bubbles()
         if not self.inbox:
             hint = lvgl.label(self.fr.body)
@@ -109,8 +119,13 @@ class App(BaseApp):
             self._bubbles.append(hint)
             self.dirty = False
             return
+        last = None
         for (who, text, _ts) in self.inbox:
-            self._add_bubble(who == "me", text)
+            mine = (who == "me")
+            if not mine and who != last:
+                self._add_sender(who)
+            self._add_bubble(mine, text)
+            last = who
         self.dirty = False
 
     def _scroll_bottom(self):
@@ -146,7 +161,7 @@ class App(BaseApp):
 
     def run_foreground(self):
         kb = self.badge.keyboard
-        if kb.esc():
+        if kb.esc() or kb.f5():
             self.switch_to_background()
             return
         if self.dirty:

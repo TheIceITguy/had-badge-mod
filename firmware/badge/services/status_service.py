@@ -9,7 +9,8 @@ import lvgl
 
 from core.services import Service
 from core.events import (EV_BATTERY, EV_WIFI_STATE, EV_MESH_NODE_UPDATE,
-                         EV_BACKEND_CHANGED, EV_POSITION_UPDATE)
+                         EV_BACKEND_CHANGED, EV_POSITION_UPDATE,
+                         EV_MESSAGE_RECEIVED, EV_MESSAGES_READ)
 from ui import icons, theme
 
 
@@ -36,6 +37,8 @@ class StatusService(Service):
         self.events.subscribe(EV_MESH_NODE_UPDATE, self._on_mesh)
         self.events.subscribe(EV_BACKEND_CHANGED, self._on_backend)
         self.events.subscribe(EV_POSITION_UPDATE, self._on_pos)
+        self.events.subscribe(EV_MESSAGE_RECEIVED, self._on_msg)
+        self.events.subscribe(EV_MESSAGES_READ, self._on_read)
 
     def _build_sidebar(self):
         top = lvgl.layer_top()
@@ -89,3 +92,9 @@ class StatusService(Service):
 
     def _on_pos(self, p):
         self.gps.set_state(theme.gps_state(True, bool(p.get("lat")), p.get("sats")))
+
+    def _on_msg(self, _m):
+        self.mesh.notify(True)      # unread indicator until Messages is opened
+
+    def _on_read(self, _x):
+        self.mesh.notify(False)

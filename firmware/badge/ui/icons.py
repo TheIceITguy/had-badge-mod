@@ -101,6 +101,8 @@ class MeshIcon:
             _rect(self.o, 7, 5, 4, 4, theme.C_IDLE, radius=2),
             _rect(self.o, 13, 5, 4, 4, theme.C_IDLE, radius=2),
         ]
+        self.note = _rect(self.o, 14, 0, 4, 4, theme.C_ACCENT, radius=2)
+        _hide(self.note)
         self.set_state(False, 0)
 
     def set_state(self, backend_up, peers, tx=False):
@@ -112,6 +114,12 @@ class MeshIcon:
                 _fill(dot, theme.C_ACCENT)
             else:
                 _fill(dot, theme.C_OK if i < level else theme.C_IDLE)
+
+    def notify(self, on):
+        if on:
+            _fill(self.note, theme.C_ACCENT)
+        else:
+            _hide(self.note)
 
 
 class GpsIcon:
@@ -138,20 +146,23 @@ class GpsIcon:
             _fill(self.dot, theme.C_OK)
 
 
-def app_glyph(parent, letter, size=40):
-    """A rounded accent tile with a centered letter — used by launcher/settings."""
+def app_icon(parent, color, size=34):
+    """A flat rounded color chip (no gradient, no letter) for launcher tiles."""
     g = lvgl.obj(parent)
     g.set_size(size, size)
     g.set_scrollbar_mode(0)
     g.set_style_pad_all(0, 0)
     g.set_style_border_width(0, 0)
     g.set_style_radius(theme.R_CARD, 0)
-    g.set_style_bg_color(_hx(theme.C_ACCENT), 0)
-    g.set_style_bg_grad_color(_hx(theme.C_ACCENT_DK), 0)
-    g.set_style_bg_grad_dir(lvgl.GRAD_DIR.VER, 0)
-    lbl = lvgl.label(g)
-    lbl.set_text(letter[:1].upper() if letter else "?")
-    lbl.set_style_text_color(_hx(theme.C_ON_ACCENT), 0)
-    lbl.set_style_text_font(theme.f_title() if size <= 24 else theme.f_hero(), 0)
-    lbl.align(lvgl.ALIGN.CENTER, 0, 0)
+    g.set_style_bg_opa(255, 0)
+    g.set_style_bg_color(_hx(color), 0)
+    # subtle flat inner notch for a modern look (small darker square, no gradient)
+    inner = lvgl.obj(g)
+    inner.set_scrollbar_mode(0)
+    inner.set_size(size // 3, size // 3)
+    inner.set_style_border_width(0, 0)
+    inner.set_style_radius(size // 6, 0)
+    inner.set_style_bg_opa(60, 0)
+    inner.set_style_bg_color(_hx(0x000000), 0)
+    inner.align(lvgl.ALIGN.CENTER, 0, 0)
     return g
