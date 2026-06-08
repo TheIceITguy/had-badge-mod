@@ -14,7 +14,6 @@ import random
 APPMOD_DENYLIST = {
     "__init__",
     "app_manager",
-    "app_menu",
     "base_app",
     "launcher",
     "msg_app",

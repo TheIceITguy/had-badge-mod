@@ -38,6 +38,25 @@ firmware/tests/        # host-side CPython tests (NOT deployed)
 firmware/scripts/      # deploy + on-device probe helpers
 ```
 
+## On-device UI
+
+A custom dark, professional UI (no LVGL symbol fonts — all icons are drawn from
+primitives, robust on this build):
+
+- **Left status sidebar** (persistent on every screen): mesh/LoRa, WiFi, GPS, and
+  a real battery icon (level / charging / USB / no-battery), updated live from
+  events. Content is inset past it so nothing overlaps.
+- **Launcher** home: app tiles, arrow-select + Enter, F1–F5 accelerators.
+- **Messages**: WhatsApp-style chat bubbles with an always-on bottom input — type
+  immediately, Enter sends, Up/Down scroll, Esc home.
+- **Settings**: categorized master-detail (category → items → inline editor);
+  bools toggle, enums cycle, ints step, Esc backs out.
+- **GPS / Compass / Track / NodeMap**: consistent themed screens.
+- Global keys: **Enter** = activate/send, **Esc** = back, **arrows** = navigate,
+  **F1–F5** = labelled accelerators.
+
+All preloaded Hackaday apps/content were removed; only the apps above remain.
+
 ## Build / deploy
 
 The firmware is MicroPython; you sync the `firmware/badge/` tree onto a badge that is
