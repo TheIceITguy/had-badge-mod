@@ -9,7 +9,7 @@ try:
     from net.backend_badgenet import BadgeNetBackend
     from net.mesh.backend_meshtastic import MeshtasticBackend
     from services.mesh_service import MeshService
-    from apps import app_manager, app_menu, chat, config_manager, usb_debug, nametag, talks, msg_app, settings_app
+    from apps import app_manager, app_menu, msg_app, settings_app
 except Exception as ex:
     # If anything goes wrong at import time, wait a second and print it
     # Sometimes these are hard to see, so the delay and extra print may help
@@ -46,18 +46,12 @@ async def main():
     # These apps are on the main screen when the badge boots
     primary_apps = [
         # Messages is the backend-agnostic communicator (Meshtastic or BadgeNet).
-        # It supersedes the BadgeNet-only stock Chat app on the home screen.
         msg_app.App("Messages", badge),
-        talks.Talks("Talks", badge),
-        nametag.App("Nametag", badge),
         user_app_manager,
         # Schema-driven settings page (manage WiFi/GPS/region/backend/power/name).
         settings_app.App("Config", badge),
     ]
-    # These apps aren't listed in the menus, so put them here to get started below
-    backgrounded_apps = [
-        usb_debug.UsbDebug("USB Debug", badge),
-    ]
+    backgrounded_apps = []
     main_menu = app_menu.AppMenu("Main", badge, primary_apps, True)
     for app in primary_apps:
         if app:

@@ -15,18 +15,10 @@ APPMOD_DENYLIST = {
     "__init__",
     "app_manager",
     "app_menu",
-    "badgeshark",
     "base_app",
-    "chat",
-    "config_manager",
-    "demo",
+    "launcher",
     "msg_app",
-    "nametag",
-    "net_tools",
     "settings_app",
-    "talks",
-    "template_app",
-    "usb_debug",
 }
 
 class AppManager(BaseApp):
