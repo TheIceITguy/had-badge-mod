@@ -9,7 +9,7 @@ try:
     from net.backend_badgenet import BadgeNetBackend
     from net.mesh.backend_meshtastic import MeshtasticBackend
     from services.mesh_service import MeshService
-    from apps import app_manager, app_menu, msg_app, settings_app
+    from apps import app_manager, launcher, msg_app, settings_app
 except Exception as ex:
     # If anything goes wrong at import time, wait a second and print it
     # Sometimes these are hard to see, so the delay and extra print may help
@@ -49,24 +49,18 @@ async def main():
     badge.services.register(status_service)
     status_service.start()
 
-    user_app_manager = app_manager.AppManager("Apps", badge)
-    # These apps are on the main screen when the badge boots
-    primary_apps = [
-        # Messages is the backend-agnostic communicator (Meshtastic or BadgeNet).
-        msg_app.App("Messages", badge),
-        user_app_manager,
-        # Schema-driven settings page (manage WiFi/GPS/region/backend/power/name).
-        settings_app.App("Config", badge),
-    ]
-    backgrounded_apps = []
-    main_menu = app_menu.AppMenu("Main", badge, primary_apps, True)
-    for app in primary_apps:
-        if app:
-            app.start()
-    for app in backgrounded_apps:
+    # Discover any apps dropped into /apps (GPS, Compass, Track, NodeMap, plus
+    # user-added apps) via the dynamic scanner, then build the home app list.
+    app_scan = app_manager.AppManager("Apps", badge)
+    home_apps = [msg_app.App("Messages", badge)]
+    home_apps += app_scan.apps
+    home_apps.append(settings_app.App("Config", badge))
+
+    home = launcher.Launcher("Home", badge, home_apps)
+    for app in home_apps:
         app.start()
-    main_menu.start()
-    main_menu.switch_to_foreground()
+    home.start()
+    home.switch_to_foreground()
 
     # To capture all network packets for debugging, set to True
     capture_all_packets(False)
