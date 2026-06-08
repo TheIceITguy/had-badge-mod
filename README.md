@@ -112,6 +112,18 @@ It reports whether `network` (WiFi) is present, whether AES-CTR is available via
 `cryptography`, UART/ADC availability, the node id from `machine.unique_id()`, and free
 heap with LVGL up.
 
+To validate the on-screen UI (which LVGL calls/enums are bound on your binary), boot
+the badge, press Ctrl-C once in the serial REPL, then run the UI probe:
+
+```bash
+mpremote run firmware/scripts/ui_probe.py
+```
+
+It exercises every LVGL call the new UI relies on (gradients, flex, layer_top,
+textarea input, label wrap/auto-height, scrolling) on a non-displayed scratch screen
+and prints an `OK`/`FAIL` line for each. Paste the `UI PROBE RESULTS` block back to get
+any `FAIL`s fixed.
+
 ## Roadmap
 
 | Milestone | Scope | State |
