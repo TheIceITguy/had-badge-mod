@@ -102,6 +102,7 @@ class Keyboard:
         self._f3 = FN_UNPRESSED
         self._f4 = FN_UNPRESSED
         self._f5 = FN_UNPRESSED
+        self._esc = FN_UNPRESSED
 
         # Create I2C Bus for keyboard.
         # Use controller 1 so we stay separate from the SAO header bus.
@@ -158,6 +159,13 @@ class Keyboard:
             return True
         return False
 
+    def esc(self) -> bool:
+        """Edge-triggered Escape: True once per press. Universal 'Back'."""
+        if self._esc == FN_PRESSED_UNREAD:
+            self._esc = FN_PRESSED_READ
+            return True
+        return False
+
     async def read_hw(self):
         """Check TCA8418 for new key press/release events, and update
         the keybuffer and state of special keys.
@@ -181,6 +189,11 @@ class Keyboard:
                 self.alt_pressed = bool(event[0])
             elif self.KEY_MATRIX[event[1]] == self.ESC:  # check if event is esc key
                 self.escape_pressed = bool(event[0])
+                if bool(event[0]):
+                    if self._esc != FN_PRESSED_READ:
+                        self._esc = FN_PRESSED_UNREAD
+                else:
+                    self._esc = FN_UNPRESSED
             # Check function keys
             elif self.KEY_MATRIX[event[1]] == self.F1:
                 if bool(event[0]):

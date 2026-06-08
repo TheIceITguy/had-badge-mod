@@ -1,58 +1,46 @@
+"""Legacy style objects, re-pointed to the dark theme (ui/theme.py).
+
+Kept so the legacy Page widget and any code referencing these names keep working
+during the UI migration; new screens use ui/theme.py + ui/frame.py directly.
+"""
 import lvgl
 
-lcd_color_bg      = lvgl.color_hex(0xabc5a0)
-lcd_color_fg      = lvgl.color_hex(0x292b29)
-lcd_color_fg_dark = lvgl.color_hex(0x080908)
+from ui import theme
 
-# Neutral theme colors (de-branded). The accent is a warm amber tuned for the LCD.
-accent   = lvgl.color_hex(0xe39810)
-bg_dark  = lvgl.color_hex(0x1a1a1a)
-fg_white = lvgl.color_hex(0xffffff)
+_hx = lvgl.color_hex
 
-# Backwards-compatibility aliases for apps that referenced the old brand names.
-hackaday_grey   = bg_dark
+# Legacy palette names, now mapped onto the dark theme tokens.
+lcd_color_bg = _hx(theme.C_BG)
+lcd_color_fg = _hx(theme.C_TEXT)
+lcd_color_fg_dark = _hx(theme.C_TEXT_DIM)
+
+accent = _hx(theme.C_ACCENT)
+bg_dark = _hx(theme.C_BG)
+fg_white = _hx(theme.C_TEXT)
+
+# Back-compat brand aliases.
+hackaday_grey = bg_dark
 hackaday_yellow = accent
-hackaday_white  = fg_white
-
-base_style = lvgl.style_t()
-base_style.init()
-base_style.set_text_font(lvgl.font_montserrat_12)
-base_style.set_bg_color(lcd_color_bg)
-base_style.set_text_color(lcd_color_fg)
-base_style.set_radius(0)
-base_style.set_border_width(0)
-base_style.set_pad_all(0)
-
-content_style = lvgl.style_t()
-content_style.init()
-content_style.set_text_font(lvgl.font_montserrat_12)
-content_style.set_bg_color(lcd_color_bg)
-content_style.set_text_color(lcd_color_fg)
-content_style.set_radius(0)
-content_style.set_border_width(0)
-content_style.set_pad_all(0)
-
-menubar_style = lvgl.style_t()
-menubar_style.init()
-menubar_style.set_text_font(lvgl.font_montserrat_16)
-menubar_style.set_bg_color(lcd_color_fg)
-menubar_style.set_text_color(lcd_color_bg)
-menubar_style.set_radius(0)
-menubar_style.set_border_width(0)
-menubar_style.set_pad_all(0)
-
-infobar_style = lvgl.style_t()
-infobar_style.init()
-infobar_style.set_text_font(lvgl.font_montserrat_14)
-infobar_style.set_bg_color(lcd_color_bg)
-infobar_style.set_text_color(lcd_color_fg_dark)
-infobar_style.set_radius(0)
-infobar_style.set_border_width(0)
-infobar_style.set_pad_all(0)
-
-lvg_color_black  	= lvgl.color_hex(0x000000)
-lvg_color_red   	= lvgl.color_hex(0x990000)
-lvg_color_green 	= lvgl.color_hex(0x006600)
+hackaday_white = fg_white
 
 
+def _style(font, bg, fg):
+    s = lvgl.style_t()
+    s.init()
+    s.set_text_font(font)
+    s.set_bg_color(bg)
+    s.set_text_color(fg)
+    s.set_radius(0)
+    s.set_border_width(0)
+    s.set_pad_all(0)
+    return s
 
+
+base_style = _style(lvgl.font_montserrat_12, _hx(theme.C_BG), _hx(theme.C_TEXT))
+content_style = _style(lvgl.font_montserrat_12, _hx(theme.C_BG), _hx(theme.C_TEXT))
+menubar_style = _style(lvgl.font_montserrat_16, _hx(theme.C_SURFACE), _hx(theme.C_TEXT))
+infobar_style = _style(lvgl.font_montserrat_14, _hx(theme.C_SURFACE), _hx(theme.C_TEXT_DIM))
+
+lvg_color_black = _hx(0x000000)
+lvg_color_red = _hx(theme.C_CRIT)
+lvg_color_green = _hx(theme.C_OK)
