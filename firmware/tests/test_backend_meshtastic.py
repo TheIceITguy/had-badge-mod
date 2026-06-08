@@ -63,6 +63,7 @@ def test_text_frame_parses_back():
 
 def test_handle_foreign_text_emits_and_rebroadcasts():
     a = make(0xA0000001)
+    a.rebroadcast = True   # router mode
     b = make(0xB0000002)
     frame = b._build_text_frame("hi from B")
     msg, rebroadcast = a._handle_frame(frame, now=100)
@@ -72,6 +73,13 @@ def test_handle_foreign_text_emits_and_rebroadcasts():
     assert rebroadcast is not None
     assert parse_header(rebroadcast)["hop_limit"] == 2          # 3 -> 2
     assert parse_header(rebroadcast)["relay_node"] == a.my_node & 0xFF
+
+
+def test_no_rebroadcast_by_default():
+    a = make(0xA0000001)            # mesh_rebroadcast defaults False (client mode)
+    b = make(0xB0000002)
+    msg, rebroadcast = a._handle_frame(b._build_text_frame("hi"), now=1)
+    assert msg is not None and rebroadcast is None
 
 
 def test_dedup_second_copy_ignored():

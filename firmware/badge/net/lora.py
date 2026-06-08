@@ -98,27 +98,19 @@ class LoraRadio:
         return None
 
     async def send(self, packet: bytes):
-        # print(f"TX:<{binascii.b2a_base64(packet, newline=False).decode()}>")
         if self.radio:
-            # Detect a free RF channel before transmitting
-            channel_status = LORA_DETECTED
-            while channel_status != CHANNEL_FREE:
-                # try:
-                #     # Don't interrupt Rx
-                #     await asyncio.wait_for(self._ready_for_tx.wait(), 2)
-                # except asyncio.TimeoutError:
-                #     # Unless nothing is being received, then go ahead and Tx
-                #     pass
+            # Listen-before-talk: scan for a free channel, but ALWAYS yield between
+            # scans and give up after a few tries (never tight-spin, never flood the
+            # serial). If the channel stays busy we transmit anyway.
+            attempts = 0
+            while True:
                 channel_status = self.radio.scanChannel()
-                if channel_status == ERR_UNKNOWN:
-                    print("SX126X error scanning channel")
-                if channel_status == LORA_DETECTED:
-                    print(".", end="")
-                else:
-                    # If busy, sleep a random 0-10ms
-                    await asyncio.sleep(random.random() / 100)
-                # channel_status = CHANNEL_FREE
-            print(">", end="")
+                if channel_status == CHANNEL_FREE or channel_status == ERR_UNKNOWN:
+                    break
+                attempts += 1
+                if attempts > 16:
+                    break
+                await asyncio.sleep(random.random() / 50)  # back off ~0-20ms, yields
             self._rf_sw_tx()
             if self.tx_led:
                 self.tx_led.value(1)

@@ -41,6 +41,8 @@ def register_meshtastic_settings(settings):
                 help="'AQ==' is the public default channel key."),
         Setting("mesh_hop_limit", TYPE_INT, 3, "Hop limit", "Radio", minv=0, maxv=7),
         Setting("mesh_share_position", TYPE_BOOL, False, "Share my GPS position", "Radio"),
+        Setting("mesh_rebroadcast", TYPE_BOOL, False, "Relay others' packets", "Radio",
+                help="Off = handheld client (don't retransmit). On = act as a router."),
     ])
 
 
@@ -69,6 +71,7 @@ class MeshtasticBackend(NetBackend):
         self.channel_name = self._setting("mesh_channel_name", "LongFast")
         self.psk = parse_psk(self._setting("mesh_psk", "AQ=="))
         self.hop_limit = int(self._setting("mesh_hop_limit", 3))
+        self.rebroadcast = bool(self._setting("mesh_rebroadcast", False))
         try:
             self.tx_power = int(self._setting("radio_tx_power", 9))
         except (TypeError, ValueError):
@@ -152,7 +155,7 @@ class MeshtasticBackend(NetBackend):
         if hdr["from"] == self.my_node:
             return None, None  # our own packet echoed back
         rebroadcast = None
-        if hdr["to"] == BROADCAST and hdr["hop_limit"] > 0:
+        if self.rebroadcast and hdr["to"] == BROADCAST and hdr["hop_limit"] > 0:
             rebroadcast = self.decrement_hop(frame, self.my_node)
         return self._data_to_message(hdr, data), rebroadcast
 
