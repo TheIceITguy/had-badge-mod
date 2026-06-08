@@ -14,8 +14,6 @@ try:
 except ImportError:  # pragma: no cover
     import uasyncio as aio
 
-import lvgl
-
 from machine import Pin, ADC
 
 from core.services import Service
@@ -63,7 +61,6 @@ class BatteryService(Service):
         self.available = False
         self.volts = None
         self.pct = None
-        self._overlay = None
         self._task = None
         self._dim_task = None
 
@@ -104,7 +101,6 @@ class BatteryService(Service):
     def start(self):
         super().start()
         self._setup_adc()
-        self._make_overlay()
         self._task = aio.create_task(self._poll_loop())
         self._dim_task = aio.create_task(self._backlight_loop())
 
@@ -112,40 +108,23 @@ class BatteryService(Service):
         return {"name": self.name, "available": self.available,
                 "pct": self.pct, "volts": self.volts}
 
-    # --- overlay (top layer = every screen) -----------------------------
-    def _make_overlay(self):
-        try:
-            top = lvgl.layer_top()
-            self._overlay = lvgl.label(top)
-            self._overlay.set_style_text_font(lvgl.font_montserrat_12, 0)
-            self._overlay.align(lvgl.ALIGN.TOP_RIGHT, -2, 1)
-            self._overlay.set_text("--")
-        except Exception as exc:  # noqa: BLE001
-            print("battery: overlay create failed:", exc)
-            self._overlay = None
-
-    def _update_overlay(self):
-        if self._overlay is None:
-            return
-        try:
-            self._overlay.set_text("n/a" if self.pct is None else ("%d%%" % self.pct))
-        except Exception:  # noqa: BLE001
-            pass
-
     # --- loops ----------------------------------------------------------
     async def _poll_loop(self):
         while True:
             self.volts = self._read_volts()
             self.pct = volts_to_pct(self.volts)
-            self._update_overlay()
-            if self.pct is not None:
-                self.events.publish(EV_BATTERY, {"volts": self.volts, "pct": self.pct,
-                                                 "charging": None})
+            present = self.available and self.pct is not None
+            # Publish every poll (even with no battery) so the sidebar icon can
+            # render the "no battery" state instead of the old "n/a" text overlay.
+            self.events.publish(EV_BATTERY, {"volts": self.volts, "pct": self.pct,
+                                             "charging": False, "usb": not present,
+                                             "present": present})
+            if present:
                 try:
                     low = int(self.settings.get("bat_low_threshold_pct", 20))
                 except (TypeError, ValueError):
                     low = 20
-                if self.pct <= low:
+                if self.pct is not None and self.pct <= low:
                     self.events.publish(EV_BATTERY_LOW, {"pct": self.pct})
             try:
                 interval = int(self.settings.get("bat_poll_s", 30))

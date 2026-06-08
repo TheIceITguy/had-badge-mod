@@ -42,6 +42,13 @@ async def main():
     badge.services.register(mesh_service)
     mesh_service.start()
 
+    # Persistent left status sidebar (battery/wifi/mesh/gps) on layer_top.
+    # Start before any app builds a screen so the theme styles + sidebar exist.
+    from services.status_service import StatusService
+    status_service = StatusService(badge)
+    badge.services.register(status_service)
+    status_service.start()
+
     user_app_manager = app_manager.AppManager("Apps", badge)
     # These apps are on the main screen when the badge boots
     primary_apps = [
