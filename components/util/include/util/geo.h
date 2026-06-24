@@ -2,6 +2,9 @@
 #ifndef UTIL_GEO_H
 #define UTIL_GEO_H
 
+/* A geographic point in decimal degrees. */
+typedef struct { double lat, lon; } geo_pt_t;
+
 /* Distance in metres between two lat/lon points (haversine). */
 double geo_distance_m(double lat1, double lon1, double lat2, double lon2);
 
