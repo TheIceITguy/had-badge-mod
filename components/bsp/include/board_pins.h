@@ -46,6 +46,20 @@
 #define GPS_UART_NUM       1
 #define GPS_UART_BAUD      9600
 
+/* --- SAO v2 expansion header (Simple Add-On, 2x3 0.1") -------------------- */
+/* Standard SAO pinout brings out 3V3, GND, a second I2C bus and two spare GPIO.
+ * The I2C lines are independent of the keyboard bus (KBD_I2C_PORT 0), so an
+ * add-on never contends with the keyboard. Used for the optional ICM-20948
+ * IMU/magnetometer; to mount that sensor inside the case the 2x3 header is
+ * desoldered and the chip wired straight to the footprint pads. */
+#define PIN_SAO_SDA        4        /* SAO_SDA  */
+#define PIN_SAO_SCL        5        /* SAO_SCL  */
+#define PIN_SAO_GPIO1      7        /* SAO_GPIO1 - spare / IMU FSYNC or 2nd INT */
+#define PIN_SAO_GPIO2      6        /* SAO_GPIO2 - IMU INT (wake-on-motion)     */
+#define SAO_I2C_PORT       1        /* ESP32-S3 I2C unit 1 (unit 0 = keyboard) */
+#define SAO_I2C_HZ         400000   /* ICM-20948 fast-mode I2C ceiling         */
+#define IMU_I2C_ADDR       0x68     /* ICM-20948 AD0=0 (0x69 if AD0 tied high) */
+
 /* --- Misc ----------------------------------------------------------------- */
 #define PIN_DEBUG_LED      1        /* active LOW */
 #define PIN_BAT_ADC        (-1)     /* unconfirmed on this board; off by default */
