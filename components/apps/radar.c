@@ -17,12 +17,9 @@
 #include "drivers/gps.h"
 #include "util/geo.h"
 #include "util/radar_proj.h"
-#include "util/map_proj.h"
-#include "util/vmap.h"
-#include "esp_heap_caps.h"
+#include "ui/map_canvas.h"
 
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
@@ -38,25 +35,15 @@
 static const double RANGES[] = {200.0, 1000.0, 5000.0, -1.0};
 #define NRANGES ((int)(sizeof RANGES / sizeof RANGES[0]))
 
-/* Map overlay tuning. */
-#define MAP_MARGIN  1.15        /* enlarge the cull box so rim-crossers survive */
-#define MAP_MIN_MS  500         /* min interval between overlay redraws (ms) */
-#define MAP_UP_EPS  3.0         /* heading change that forces a redraw (deg) */
-
 static lv_obj_t *s_area, *s_title, *s_info;
 static lv_obj_t *s_blip[BLIP_MAX];
 static int s_mode;          /* 0 = north-up, 1 = heading-up (when moving) */
 static int s_range_idx;     /* index into RANGES */
 static uint32_t s_sel;      /* highlighted node, 0 = none */
 
-static lv_obj_t *s_map;         /* RGB565 canvas behind the blips */
-static void *s_map_buf;         /* canvas backing store (heap) */
+static map_canvas_t *s_mc;      /* offline map overlay behind the blips */
 static settings_t *s_reg;       /* registry for the radar_map toggle */
 static bool s_map_on;           /* overlay enabled */
-static bool s_map_present;      /* a readable /spiffs/map.vmap exists */
-static bool s_map_valid;        /* the canvas matches s_drawn_* below */
-static double s_drawn_lat, s_drawn_lon, s_drawn_up, s_drawn_range;
-static uint32_t s_drawn_ms;     /* lv_tick at the last redraw */
 
 static const setting_t RADAR_SCHEMA[] = {
     {.key = "radar_map", .type = SET_BOOL, .def = "false",
@@ -120,66 +107,6 @@ static void set_labels(void)
                        s_map_on ? "Map*" : "Map", "");
 }
 
-static double ang_diff(double a, double b)
-{
-    double d = fmod(a - b + 540.0, 360.0) - 180.0;
-    return d < 0 ? -d : d;
-}
-
-/* Redraw the map canvas for the given view: clear to the scope colour, then (if
- * the overlay is on and a map file is present) stream the .vmap, cull
- * out-of-view features by bbox, project each kept polyline with the same
- * orientation as the blips and clip it to the rim. Called only when the view
- * changed -- never every tick. */
-static void map_redraw(double clat, double clon, double up, double range)
-{
-    if (!s_map || !s_map_buf) return;
-    lv_canvas_fill_bg(s_map, theme_hex(C_SURFACE), LV_OPA_COVER);
-    if (!s_map_on || range <= 0.0) return;
-
-    vmap_reader_t r;
-    if (vmap_open(&r, VMAP_DEFAULT_PATH) != 0) { s_map_present = false; return; }
-    s_map_present = true;
-
-    map_bbox_e7_t view;
-    map_view_bbox(clat, clon, range, MAP_MARGIN, &view);
-
-    lv_layer_t layer;
-    lv_canvas_init_layer(s_map, &layer);
-
-    lv_draw_line_dsc_t road, water;
-    lv_draw_line_dsc_init(&road);
-    road.color = theme_hex(C_TEXT_DIM); road.width = 1; road.opa = LV_OPA_COVER;
-    lv_draw_line_dsc_init(&water);
-    water.color = theme_hex(C_CHARGE); water.width = 1; water.opa = LV_OPA_COVER;
-
-    static int32_t pts[2 * VMAP_MAX_POINTS];   /* static: off the LVGL task stack */
-    vmap_feature_t ft;
-    while (vmap_next(&r, &ft) == 1) {
-        if (!map_bbox_overlap(&view, &ft.bbox)) { vmap_skip_points(&r, &ft); continue; }
-        int n = vmap_read_points(&r, &ft, pts, (int)(sizeof pts / sizeof pts[0]));
-        if (n < 2) continue;
-        lv_draw_line_dsc_t *dsc = (ft.cls == VMAP_CLASS_WATER) ? &water : &road;
-        float px, py;
-        map_project(clat, clon, pts[0] / VMAP_E7, pts[1] / VMAP_E7,
-                    up, range, CX, CY, R_PX, &px, &py);
-        for (int i = 1; i < n; i++) {
-            float qx, qy, vx0, vy0, vx1, vy1;
-            map_project(clat, clon, pts[2 * i] / VMAP_E7, pts[2 * i + 1] / VMAP_E7,
-                        up, range, CX, CY, R_PX, &qx, &qy);
-            if (map_clip_segment_px(px, py, qx, qy, CX, CY, R_PX,
-                                    &vx0, &vy0, &vx1, &vy1)) {
-                dsc->p1.x = (int32_t)lroundf(vx0); dsc->p1.y = (int32_t)lroundf(vy0);
-                dsc->p2.x = (int32_t)lroundf(vx1); dsc->p2.y = (int32_t)lroundf(vy1);
-                lv_draw_line(&layer, dsc);
-            }
-            px = qx; py = qy;
-        }
-    }
-    vmap_close(&r);
-    lv_canvas_finish_layer(s_map, &layer);
-}
-
 static void build(lv_obj_t **screen, lv_group_t *group)
 {
     (void)group;
@@ -199,22 +126,10 @@ static void build(lv_obj_t **screen, lv_group_t *group)
     lv_obj_remove_flag(s_area, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_style_clip_corner(s_area, true, 0);   /* mask the canvas to the rim */
 
-    /* Map overlay canvas, created before the rings/blips so it sits behind them. */
-    s_map = lv_canvas_create(s_area);
-    lv_obj_set_pos(s_map, 0, 0);
-    lv_obj_set_size(s_map, SCOPE, SCOPE);
-    lv_obj_set_style_pad_all(s_map, 0, 0);
-    lv_obj_set_style_border_width(s_map, 0, 0);
-    lv_obj_remove_flag(s_map, LV_OBJ_FLAG_SCROLLABLE);
-    size_t mbsz = LV_CANVAS_BUF_SIZE(SCOPE, SCOPE, 16, LV_DRAW_BUF_STRIDE_ALIGN);
-    s_map_buf = heap_caps_malloc(mbsz, MALLOC_CAP_SPIRAM);
-    if (!s_map_buf) s_map_buf = heap_caps_malloc(mbsz, MALLOC_CAP_DEFAULT);
-    if (s_map_buf) {
-        lv_canvas_set_buffer(s_map, s_map_buf, SCOPE, SCOPE, LV_COLOR_FORMAT_RGB565);
-        lv_canvas_fill_bg(s_map, theme_hex(C_SURFACE), LV_OPA_COVER);
-    }
-    s_map_valid = false;
-    s_map_present = false;
+    /* Map overlay, created before the rings/blips so it sits behind them. The
+     * round scope clips it to the rim (MAP_CLIP_CIRCLE, radius R_PX). */
+    s_mc = map_canvas_create(s_area, SCOPE, SCOPE, MAP_CLIP_CIRCLE, R_PX);
+    lv_obj_set_pos(map_canvas_obj(s_mc), 0, 0);
 
     make_ring(s_area, (int)(R_PX * 2.0f));   /* outer rim */
     make_ring(s_area, (int)R_PX);            /* half-range ring */
@@ -258,9 +173,8 @@ static void on_fkey(int n)
     else if (n == 4) {
         s_map_on = !s_map_on;
         if (s_reg) settings_set_bool(s_reg, "radar_map", s_map_on);
-        s_map_valid = false;   /* force a redraw (or a clear) next tick */
-        if (!s_map_on && s_map && s_map_buf)
-            lv_canvas_fill_bg(s_map, theme_hex(C_SURFACE), LV_OPA_COVER);
+        map_canvas_invalidate(s_mc);                  /* force a redraw next tick */
+        if (!s_map_on) { map_canvas_begin(s_mc); map_canvas_end(s_mc); }  /* clear to scope bg */
         set_labels();
     }
 }
@@ -278,8 +192,8 @@ static void tick(void)
         lv_label_set_text(s_title, "Radar");
         lv_label_set_text(s_info, "Need your own GPS fix to place nodes.");
         for (int i = 0; i < BLIP_MAX; i++) lv_obj_add_flag(s_blip[i], LV_OBJ_FLAG_HIDDEN);
-        if (s_map && s_map_buf) lv_canvas_fill_bg(s_map, theme_hex(C_SURFACE), LV_OPA_COVER);
-        s_map_valid = false;   /* can't place the map without a fix */
+        map_canvas_begin(s_mc); map_canvas_end(s_mc);   /* clear to scope bg */
+        map_canvas_invalidate(s_mc);                    /* can't place the map without a fix */
         return;
     }
 
@@ -300,19 +214,13 @@ static void tick(void)
         range = maxd;
     }
 
-    /* Map overlay: recompute only when the view actually moved, rotated or
-     * zoomed -- the canvas is far too costly to redraw at the 10 Hz tick. */
+    /* Map overlay: the widget gates the costly repaint to real view changes. */
     if (s_map_on) {
-        bool need = !s_map_valid
-                 || fabs(range - s_drawn_range) > s_drawn_range * 0.02
-                 || geo_distance_m(s_drawn_lat, s_drawn_lon, fix.lat, fix.lon) > range / 40.0
-                 || ang_diff(up, s_drawn_up) > MAP_UP_EPS;
-        if (need && (!s_map_valid || lv_tick_elaps(s_drawn_ms) >= MAP_MIN_MS)) {
-            map_redraw(fix.lat, fix.lon, up, range);
-            s_drawn_lat = fix.lat; s_drawn_lon = fix.lon;
-            s_drawn_up = up; s_drawn_range = range;
-            s_map_valid = true;
-            s_drawn_ms = lv_tick_get();
+        map_canvas_set_view(s_mc, fix.lat, fix.lon, up, range);
+        if (map_canvas_view_dirty(s_mc)) {
+            map_canvas_begin(s_mc);
+            map_canvas_draw_basemap(s_mc);
+            map_canvas_end(s_mc);
         }
     }
 
@@ -353,7 +261,7 @@ static void tick(void)
         snprintf(info, sizeof info, "%d on scope of %d\nNearest: %s\n%s, bearing %.0f",
                  shown, used, name, ds, brg);
     }
-    if (s_map_on && !s_map_present) {
+    if (s_map_on && !map_canvas_present(s_mc)) {
         size_t l = strlen(info);
         snprintf(info + l, sizeof info - l, "\nNo map uploaded (see /map).");
     }
@@ -362,10 +270,7 @@ static void tick(void)
 
 static void close_app(void)
 {
-    if (s_map_buf) { free(s_map_buf); s_map_buf = NULL; }
-    s_map = NULL;
-    s_map_valid = false;
-    s_map_present = false;
+    if (s_mc) { map_canvas_delete(s_mc); s_mc = NULL; }
 }
 
 /* Register the radar settings and load the saved overlay state (call once at
