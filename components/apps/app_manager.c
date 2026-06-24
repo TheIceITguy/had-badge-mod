@@ -188,7 +188,8 @@ void app_manager_init(eventbus_t *bus)
     s_apps[7] = app_packets();
     s_apps[8] = app_tracker();
     s_apps[9] = app_radar();
-    s_napps = 10;
+    s_apps[10] = app_map();
+    s_napps = 11;
 
     s_group = lv_group_create();
     lv_group_set_default(s_group);
