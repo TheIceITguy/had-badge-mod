@@ -3,11 +3,12 @@ title: Offline maps
 description: Build a .vmap vector map from OpenStreetMap and upload it for the radar overlay.
 ---
 
-The [Radar](/apps/radar/) app can draw an offline vector map — roads and water — behind the
-blips. The map is a compact binary file (`.vmap`) you build on a PC from OpenStreetMap data and
-upload to the badge over Wi-Fi. It lives on the badge's SPIFFS storage at `/spiffs/map.vmap`;
-the radar reads it directly and projects it onto the scope with the same range/bearing maths it
-uses for the blips, so map and people stay aligned.
+The [Radar](/apps/radar/), [Map](/apps/map/) and [Breadcrumbs](/apps/breadcrumbs/) apps can draw
+an offline vector map — roads and water. The map is a compact binary file (`.vmap`) you build on
+a PC from OpenStreetMap data and upload to the badge over Wi-Fi. It lives on the badge's SPIFFS
+storage at `/spiffs/map.vmap`; the apps share one renderer (`components/ui/map_canvas.c`) that
+reads it directly and projects it with the same range/bearing maths used for the radar blips, so
+the map, your trail and other people stay aligned.
 
 There is no live download on the badge — everything is offline. A regional extract (a city
 centre a few kilometres across) is plenty for radar ranges, which top out at 5 km.

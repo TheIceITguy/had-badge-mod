@@ -17,6 +17,13 @@ a track is recording. Press F1 again to stop.
 The file is a simple CSV: a header line, then one row per point with a timestamp, latitude,
 longitude, altitude, and satellite count.
 
+Press **F2** to switch between the text view and a **map view** of the trail: the recorded
+breadcrumbs are drawn as a line over the offline roads-and-water map, centred on your current
+position (or the last recorded point), with nearby nodes marked. Press F2 again to return to the
+text view. The map needs an uploaded `.vmap` to show roads — see [Offline maps](/development/maps/) —
+but the trail itself draws either way. For a full pannable, zoomable map use the [Map](/apps/map/)
+app.
+
 ## Follow
 
 Follow loads the most recent track and shows a needle pointing toward the next waypoint on
