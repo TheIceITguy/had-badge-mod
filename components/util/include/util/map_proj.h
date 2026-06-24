@@ -32,10 +32,20 @@ void map_project(double clat, double clon, double plat, double plon,
 /* Clip segment (x0,y0)-(x1,y1) to the rim circle (centre cx,cy, radius r).
  * On overlap, writes the visible sub-segment endpoints to (*vx0,*vy0)-(*vx1,*vy1)
  * and returns true. Returns false when the segment lies entirely outside the
- * circle. A segment fully inside is returned unchanged. */
+ * circle. A segment fully inside is returned unchanged. Used by the round radar
+ * scope; rectangular full-screen map views use map_clip_segment_rect. */
 bool map_clip_segment_px(float x0, float y0, float x1, float y1,
                          float cx, float cy, float r,
                          float *vx0, float *vy0, float *vx1, float *vy1);
+
+/* Clip segment (x0,y0)-(x1,y1) to the axis-aligned rectangle
+ * [minx,maxx] x [miny,maxy] (Liang-Barsky, edges inclusive). On overlap, writes
+ * the visible sub-segment to (*vx0,*vy0)-(*vx1,*vy1) and returns true; returns
+ * false when the segment lies entirely outside. A segment fully inside is
+ * returned unchanged. Pass minx<=maxx and miny<=maxy. */
+bool map_clip_segment_rect(float x0, float y0, float x1, float y1,
+                           float minx, float miny, float maxx, float maxy,
+                           float *vx0, float *vy0, float *vx1, float *vy1);
 
 /* Lat/lon box (e7) covering the view circle of radius range_m around
  * (clat,clon), enlarged by `margin` (e.g. 1.15) so a feature that only clips

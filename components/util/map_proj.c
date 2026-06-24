@@ -66,6 +66,39 @@ bool map_clip_segment_px(float x0, float y0, float x1, float y1,
     return true;
 }
 
+bool map_clip_segment_rect(float x0, float y0, float x1, float y1,
+                           float minx, float miny, float maxx, float maxy,
+                           float *vx0, float *vy0, float *vx1, float *vy1)
+{
+    double dx = (double)x1 - x0, dy = (double)y1 - y0;
+    double t0 = 0.0, t1 = 1.0;
+    /* Four half-plane tests (left, right, top, bottom). p<0 enters, p>0 leaves. */
+    const double p[4] = {-dx, dx, -dy, dy};
+    const double q[4] = {(double)x0 - minx, (double)maxx - x0,
+                         (double)y0 - miny, (double)maxy - y0};
+
+    for (int i = 0; i < 4; i++) {
+        if (p[i] > -1e-12 && p[i] < 1e-12) {
+            if (q[i] < 0.0) return false;     /* parallel and outside this edge */
+            continue;
+        }
+        double t = q[i] / p[i];
+        if (p[i] < 0.0) {                     /* entering: raise the near bound */
+            if (t > t1) return false;
+            if (t > t0) t0 = t;
+        } else {                              /* leaving: lower the far bound */
+            if (t < t0) return false;
+            if (t < t1) t1 = t;
+        }
+    }
+
+    *vx0 = (float)(x0 + t0 * dx);
+    *vy0 = (float)(y0 + t0 * dy);
+    *vx1 = (float)(x0 + t1 * dx);
+    *vy1 = (float)(y0 + t1 * dy);
+    return true;
+}
+
 void map_view_bbox(double clat, double clon, double range_m, double margin,
                    map_bbox_e7_t *out)
 {
