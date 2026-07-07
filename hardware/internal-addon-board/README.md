@@ -13,8 +13,8 @@ All badge geometry in this folder is extracted from the official KiCad design at
 | `internal-addon-board.fzz` | The Fritzing sketch of the addon board |
 | `board-shape.svg` | Custom board outline (rev C, 42.0 x 37.5 mm) to load as the PCB shape in Fritzing |
 | `placement-overlay.png` | The outline drawn over the badge back with corner coordinates, for visual verification |
-| `communicator-badge-addon-internal.zip` | Gerber export ready for the fab |
-| `gerber/` | The same gerbers, unzipped |
+| `internal-addon-board-gerbers.zip` | Zipped gerber export (same files as `gerber/`) |
+| `gerber/` | The gerber export of the sketch, unzipped |
 | `fritzing-parts/communicator-badge-mainboard.fzpz` | Badge part, cluster variant: PCB view holds only the J8+J6 hole pattern. Use this as the electrical part in the sketch |
 | `fritzing-parts/communicator-badge-full.fzpz` | Badge part, full-board variant: PCB view holds the whole 148 x 81 mm badge with outline, mounting holes and component reference silk. Use for mechanical reference, remove before gerber export |
 | `fritzing-parts/src/` | SVG and fzp sources of both parts |
@@ -37,6 +37,21 @@ Both headers are 2.54 mm pitch through-holes, unpopulated on the stock badge. Bo
 | J6 | 4 | GND | - |
 
 Hole sizes: J8 drill 1.016 mm, pad 1.727 mm. J6 drill 1.0 mm, pad 1.7 mm.
+
+## Addon board sockets
+
+The board re-exposes the badge signals as six 2-pin sockets at 2 mm pitch, one functional pair per socket, so each module plugs one power pair plus the signal pair it needs and modules can be mixed and matched without soldering. Socket references below are the addon board's own J1-J6, not the badge headers.
+
+| Socket | Pair | Pin 1 | Pin 2 |
+|--------|------|-------|-------|
+| J1 | UART | IO12 (into badge) | IO11 (out of badge) |
+| J2 | power | GND | 3V3 |
+| J3 | GPIO | GPIO7 | GPIO6 |
+| J4 | I2C | SDA (GPIO4) | SCL (GPIO5) |
+| J5 | power | 3V3 | GND |
+| J6 | power | 3V3 | GND |
+
+Note that J2 carries 3V3 on the opposite pin to J5/J6 (as routed in the sketch); check each socket's polarity against its silkscreen before plugging polarized cables.
 
 ## Hole coordinates (badge back view)
 

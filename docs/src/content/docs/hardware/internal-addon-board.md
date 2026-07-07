@@ -28,6 +28,17 @@ J6 is the same header the [GPS](/had-badge-mod/apps/gps/) uses, so a GPS module 
 
 The 3.3 V rail is sized for the badge itself. Small sensors are fine; power-hungry modules are not. If something genuinely needs 5 V, put a boost converter on the addon board.
 
+## Connectors in pairs
+
+The addon board does not mirror the badge headers one to one. It splits the ten signals into functional pairs, one pair per 2-pin socket (2 mm pitch, JST-style), six sockets in total:
+
+- three power pairs, each 3V3 and GND
+- one UART pair, IO11 and IO12 (the J6 signals the GPS uses)
+- one I2C pair, SDA and SCL
+- one GPIO pair, GPIO7 and GPIO6
+
+Each module plugs into one power pair plus the signal pair it needs, so up to three modules ride the board at once and swap without soldering: a GPS on the UART pair, an IMU on the I2C pair, and something else on the GPIOs. The exact pin-per-socket table is in the folder [README](https://github.com/giovi321/had-badge-mod/tree/main/hardware/internal-addon-board).
+
 ## The shape
 
 The outline is a 42.0 x 37.5 mm polygon that covers the two headers and the flat passive areas, and dodges everything tall or that you still need to reach: the SX1262 radio module, the RST button, the USB-C connector, the battery JST and the SMA antenna. The attenuator bypass jumper JP1 also stays uncovered. `placement-overlay.png` shows the outline drawn over the badge back with all corner coordinates.
@@ -49,7 +60,7 @@ Everything needed is in `hardware/internal-addon-board/`:
 
 ## Fabrication
 
-Any standard service handles this board. On the PCBWay order form pick the standard 6/6 mil track/spacing class, not a finer one; the routed board does not go below 10 mil anywhere and finer classes only add cost. Drills are 1.0 and 1.016 mm with 1.7 mm pads, no slots, single lamination. The gerbers that went to the fab are in the folder, both zipped (`communicator-badge-addon-internal.zip`) and unzipped (`gerber/`).
+Any standard service handles this board. On the PCBWay order form pick the standard 6/6 mil track/spacing class, not a finer one; the routed board does not go below 10 mil anywhere and finer classes only add cost. Drills are 0.7 to 1.016 mm with standard pads, no slots, single lamination. The gerber export of the sketch is in the folder, zipped (`internal-addon-board-gerbers.zip`) and unzipped (`gerber/`). The board outline is the `_contour.gm1` layer; some online previews render only the bounding box until the outline layer is processed, so check the shape in a real gerber viewer, not the upload thumbnail.
 
 ## Assembly
 
