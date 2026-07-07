@@ -33,7 +33,9 @@ so they do not share a bus.
 
 The GPS header J6 is a 4-pin expansion connector, not fitted from the factory. Its pin order is
 3V3, IO11 (ESP TX), IO12 (ESP RX), GND. The IO12 pad is easily misread as "IO10"; GPIO10 is the
-LoRa antenna switch and is not on J6.
+LoRa antenna switch and is not on J6. The badge also has an SAO port, J8, with I2C on GPIO4/GPIO5
+and two spare GPIOs (7 and 6). A back-side PCB that breaks both headers out to JST connectors is
+documented in [Internal addon board](/had-badge-mod/hardware/internal-addon-board/).
 
 The badge has no magnetometer and no real-time clock. The compass features derive heading
 from GPS course over ground, and the clock is set from the GPS time when a fix is available.

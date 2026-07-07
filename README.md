@@ -68,6 +68,7 @@ Open `http://<badge-ip>/map` to upload `map.vmap`, then press **F4** in Radar (w
 | Keyboard | TCA8418 I2C matrix |
 | GPS (optional) | ATGM336H over UART on header J6 |
 | Case (optional) | 3D-printable, with a GPS bay — [`hardware/case/`](hardware/case/) |
+| Addon board (optional) | Back-side PCB breaking J6+J8 out to JST — [`hardware/internal-addon-board/`](hardware/internal-addon-board/) |
 
 Pins live in `components/bsp/include/board_pins.h`.
 
@@ -91,6 +92,7 @@ components/
   drivers/  radio/  services/   esp-idf hardware and tasks
   ui/  apps/                    LVGL interface
 hardware/case/                  3D-printable case (STL + notes)
+hardware/internal-addon-board/  J6+J8 breakout PCB (Fritzing + gerbers)
 host_tests/                     portable test suite
 docs/                           Astro + Starlight documentation site
 ```

@@ -33,6 +33,7 @@ export default defineConfig({
           items: [
             { label: 'Board and pins', link: '/hardware/overview/' },
             { label: 'Case and enclosure', link: '/hardware/case/' },
+            { label: 'Internal addon board', link: '/hardware/internal-addon-board/' },
           ],
         },
         {

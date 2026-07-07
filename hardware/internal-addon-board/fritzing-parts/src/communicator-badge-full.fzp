@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<module fritzingVersion="1.0.2" moduleId="giovi321-hackaday-communicator-badge-full-back_v1">
+ <version>1.2</version>
+ <author>giovi321 (geometry: Hack-a-Day, MIT)</author>
+ <title>Hackaday Communicator Badge - full board (back view)</title>
+ <label>BADGE</label>
+ <date>2026-07-07</date>
+ <description>Hackaday Supercon Communicator badge - main board, dimensionally accurate: 148 x 81 mm, generated from the official KiCad design (github.com/Hack-a-Day/2025-Communicator_Badge, MIT license).
+
+Exposes the two expansion headers (plain through-holes on the stock badge) as connectors:
+J8 - SAO v2 port, 2x3, 2.54 mm pitch, hole 1.016 mm: 3V3, GND, SDA (GPIO4), SCL (GPIO5), GPIO1 (GPIO7), GPIO2 (GPIO6).
+J6 - expansion/GPS header, 1x4, 2.54 mm pitch, hole 1.0 mm: 3V3, IO11 (ESP TX), IO12 (ESP RX), GND.
+
+BACK (battery-side) view, x mirrored, for add-on boards mounted on the back face. J8 pin 1 sits at (40.358, 9.596) mm from the back-view top-left corner; J6 pin 1 at (28.420, 6.040); J6-1 relative to J8-1: (-11.938, -3.556) mm = 4.7 x 1.4 pitches of 2.54 mm, so use a 0.254 mm grid when laying out a mating breakout. Watch back-side obstacles: the SX1262 module sits directly left of J6, the RST button below J8, and the ESP32-S3 module to the right; leave standoff height and keep RST reachable. FULL-BOARD variant: the PCB view carries the complete 148 x 81 mm board outline (slot, lanyard holes, edge recesses) plus the component outlines of the populated side as reference silkscreen, the four M3 and two 2.2 mm mounting holes as drilled unconnected pads, and J7 as connectors (J7-3 = GND; J7-1/J7-2 not traced). Use it as a mechanical reference and drill/alignment template while laying out an add-on board. If you do not want the reference silkscreen in the exported gerbers, swap it for the cluster variant (same J8/J6 pad geometry) before export. The PCB view contains only the J8+J6 hole cluster at exact spacing, usable as a drill template. J7 (1x3 serial header) is drawn but not wired as a connector.</description>
+ <tags><tag>hackaday</tag><tag>supercon</tag><tag>badge</tag><tag>SAO</tag><tag>ESP32-S3</tag><tag>LoRa</tag></tags>
+ <properties>
+  <property name="family">hackaday communicator badge</property>
+  <property name="variant">full board, back view</property>
+  <property name="layer"></property>
+ </properties>
+ <views>
+  <iconView><layers image="icon/communicator-badge-full_icon.svg"><layer layerId="icon"/></layers></iconView>
+  <breadboardView><layers image="breadboard/communicator-badge-full_breadboard.svg"><layer layerId="breadboard"/></layers></breadboardView>
+  <schematicView><layers image="schematic/communicator-badge-full_schematic.svg"><layer layerId="schematic"/></layers></schematicView>
+  <pcbView><layers image="pcb/communicator-badge-full_pcb.svg"><layer layerId="copper0"/><layer layerId="copper1"/><layer layerId="silkscreen"/></layers></pcbView>
+ </views>
+ <connectors>
+  <connector id="connector0" name="J8-1 VCC (3V3)" type="female">
+   <description>SAO power, 3.3 V rail (same net as J6-1)</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector0pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector0pin" terminalId="connector0terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector0pin"/><p layer="copper1" svgId="connector0pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector1" name="J8-2 GND" type="female">
+   <description>Ground (same net as J6-4)</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector1pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector1pin" terminalId="connector1terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector1pin"/><p layer="copper1" svgId="connector1pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector2" name="J8-3 SDA" type="female">
+   <description>SAO I2C data, ESP32-S3 GPIO4</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector2pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector2pin" terminalId="connector2terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector2pin"/><p layer="copper1" svgId="connector2pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector3" name="J8-4 SCL" type="female">
+   <description>SAO I2C clock, ESP32-S3 GPIO5</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector3pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector3pin" terminalId="connector3terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector3pin"/><p layer="copper1" svgId="connector3pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector4" name="J8-5 GPIO1" type="female">
+   <description>SAO GPIO1, ESP32-S3 GPIO7</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector4pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector4pin" terminalId="connector4terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector4pin"/><p layer="copper1" svgId="connector4pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector5" name="J8-6 GPIO2" type="female">
+   <description>SAO GPIO2, ESP32-S3 GPIO6</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector5pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector5pin" terminalId="connector5terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector5pin"/><p layer="copper1" svgId="connector5pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector6" name="J6-1 3V3" type="female">
+   <description>3.3 V rail (same net as J8-1)</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector6pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector6pin" terminalId="connector6terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector6pin"/><p layer="copper1" svgId="connector6pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector7" name="J6-2 IO11" type="female">
+   <description>ESP32-S3 GPIO11, UART TX out of badge (to GPS RX)</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector7pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector7pin" terminalId="connector7terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector7pin"/><p layer="copper1" svgId="connector7pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector8" name="J6-3 IO12" type="female">
+   <description>ESP32-S3 GPIO12, UART RX into badge (from GPS TX)</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector8pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector8pin" terminalId="connector8terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector8pin"/><p layer="copper1" svgId="connector8pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector9" name="J6-4 GND" type="female">
+   <description>Ground (same net as J8-2)</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector9pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector9pin" terminalId="connector9terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector9pin"/><p layer="copper1" svgId="connector9pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector10" name="J7-1 (serial, not traced)" type="female">
+   <description>Serial expansion pin 1, net not traced in the KiCad file</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector10pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector10pin" terminalId="connector10terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector10pin"/><p layer="copper1" svgId="connector10pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector11" name="J7-2 (serial, not traced)" type="female">
+   <description>Serial expansion pin 2, net not traced in the KiCad file</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector11pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector11pin" terminalId="connector11terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector11pin"/><p layer="copper1" svgId="connector11pin"/></pcbView>
+   </views>
+  </connector>
+  <connector id="connector12" name="J7-3 GND" type="female">
+   <description>Ground (same net as J8-2 and J6-4)</description>
+   <views>
+    <breadboardView><p layer="breadboard" svgId="connector12pin"/></breadboardView>
+    <schematicView><p layer="schematic" svgId="connector12pin" terminalId="connector12terminal"/></schematicView>
+    <pcbView><p layer="copper0" svgId="connector12pin"/><p layer="copper1" svgId="connector12pin"/></pcbView>
+   </views>
+  </connector>
+ </connectors>
+ <buses>
+  <bus id="3v3"><nodeMember connectorId="connector0"/><nodeMember connectorId="connector6"/></bus>
+  <bus id="gnd"><nodeMember connectorId="connector1"/><nodeMember connectorId="connector9"/><nodeMember connectorId="connector12"/></bus>
+ </buses>
+</module>

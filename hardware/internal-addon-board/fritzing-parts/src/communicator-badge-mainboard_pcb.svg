@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="20.0mm" height="15.0mm" viewBox="0 0 20.0 15.0">
+<g id="silkscreen">
+<rect x="9.578" y="5.696" width="9.48" height="6.34" fill="none" stroke="#ffffff" stroke-width="0.25" rx="0.5"/>
+<rect x="3.32" y="2.44" width="3.2" height="10.82" fill="none" stroke="#ffffff" stroke-width="0.25" rx="0.5"/>
+<text x="14.318" y="2.696" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.4" fill="#ffffff" text-anchor="middle">J8</text>
+<text x="4.92" y="1.74" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.4" fill="#ffffff" text-anchor="middle">J6</text>
+<text x="16.858" y="4.896" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.1" fill="#ffffff" text-anchor="middle">VCC</text>
+<text x="16.858" y="13.736" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.1" fill="#ffffff" text-anchor="middle">GND</text>
+<text x="14.318" y="4.896" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.1" fill="#ffffff" text-anchor="middle">SDA</text>
+<text x="14.318" y="13.736" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.1" fill="#ffffff" text-anchor="middle">SCL</text>
+<text x="11.778" y="4.896" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.1" fill="#ffffff" text-anchor="middle">GPIO1</text>
+<text x="11.778" y="13.736" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.1" fill="#ffffff" text-anchor="middle">GPIO2</text>
+<text x="3.22" y="4.44" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.1" fill="#ffffff" text-anchor="end">3V3</text>
+<text x="3.22" y="6.98" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.1" fill="#ffffff" text-anchor="end">IO11</text>
+<text x="3.22" y="9.52" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.1" fill="#ffffff" text-anchor="end">IO12</text>
+<text x="3.22" y="12.06" font-family="DroidSans, 'DejaVu Sans', sans-serif" font-size="1.1" fill="#ffffff" text-anchor="end">GND</text>
+</g>
+<g id="copper1"><g id="copper0">
+<circle id="connector0pin" cx="16.858" cy="7.596" r="0.6858" fill="none" stroke="rgb(255,191,0)" stroke-width="0.3556"/>
+<circle id="connector1pin" cx="16.858" cy="10.136" r="0.6858" fill="none" stroke="rgb(255,191,0)" stroke-width="0.3556"/>
+<circle id="connector2pin" cx="14.318" cy="7.596" r="0.6858" fill="none" stroke="rgb(255,191,0)" stroke-width="0.3556"/>
+<circle id="connector3pin" cx="14.318" cy="10.136" r="0.6858" fill="none" stroke="rgb(255,191,0)" stroke-width="0.3556"/>
+<circle id="connector4pin" cx="11.778" cy="7.596" r="0.6858" fill="none" stroke="rgb(255,191,0)" stroke-width="0.3556"/>
+<circle id="connector5pin" cx="11.778" cy="10.136" r="0.6858" fill="none" stroke="rgb(255,191,0)" stroke-width="0.3556"/>
+<circle id="connector6pin" cx="4.92" cy="4.04" r="0.675" fill="none" stroke="rgb(255,191,0)" stroke-width="0.35"/>
+<circle id="connector7pin" cx="4.92" cy="6.58" r="0.675" fill="none" stroke="rgb(255,191,0)" stroke-width="0.35"/>
+<circle id="connector8pin" cx="4.92" cy="9.12" r="0.675" fill="none" stroke="rgb(255,191,0)" stroke-width="0.35"/>
+<circle id="connector9pin" cx="4.92" cy="11.66" r="0.675" fill="none" stroke="rgb(255,191,0)" stroke-width="0.35"/>
+</g></g>
+</svg>
