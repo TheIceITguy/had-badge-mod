@@ -1,18 +1,19 @@
 # Pick And Place List
 # eMail=
 #
-# Project=Untitled Sketch_v2
-# Date=00:00:46
+# Project=internal-addon-board
+# Date=00:26:40
 # CreatedBy=Fritzing 1.0.6.2025-10-07.CD-2239-0-04e5bb02
 #
 # Coordinates in mils, always center of component
 # Origin 0/0=Lower left corner of PCB. Rotation in degree (0-360, math. pos.)
 RefDes,Description,Package,X,Y,Rotation,Side,Mount
 Description: resistance;capacitance;inductance;voltage;current;power;mpn;mn;
+Via1,";;;;;;;;","",90.1754,70.9997,0,Bottom,MANUAL
 BADGE3,";;;;;;;;","",1201.28,1225.17,0,Top,MANUAL
-J1,";;;;;;;;","THT",129.547,267.848,-90,Top,THT
-J3,";;;;;;;;","THT",444.507,267.848,-90,Top,THT
-J4,";;;;;;;;","THT",759.468,267.848,-90,Top,THT
-J2,";;;;;;;;","THT",1074.43,267.848,-90,Top,THT
+J1,";;;;;;;;","THT",129.544,267.846,-90,Top,THT
+J3,";;;;;;;;","THT",444.507,267.846,-90,Top,THT
+J4,";;;;;;;;","THT",759.467,267.846,-90,Top,THT
+J2,";;;;;;;;","THT",1074.43,267.846,-90,Top,THT
 J6,";;;;;;;;","THT",1153.17,504.068,0,Top,THT
-J5,";;;;;;;;","THT",1153.17,819.029,0,Top,THT
+J5,";;;;;;;;","THT",1153.17,819.031,0,Top,THT
