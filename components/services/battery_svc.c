@@ -11,8 +11,9 @@
 static const setting_t BAT_SCHEMA[] = {
     {.key = "bat_enabled", .type = SET_BOOL, .def = "false",
      .label = "Battery sense", .group = "Battery"},
-    /* GPIO11 (the J6 IO11 pad) is the only ADC-capable pin left free on this board,
-     * and it sits on ADC2, which the ESP32-S3 cannot read while WiFi is running.
+    /* Every ADC1 pin (GPIO1-10) is committed on this board, so the free candidates
+     * are the two J6 pads, GPIO11 and GPIO12, and GPIO12 is our own motor default.
+     * Both sit on ADC2, which the ESP32-S3 cannot read while WiFi is running.
      * Reads then fail, the state reports absent, and the sidebar icon disappears
      * until WiFi stops, which is the honest answer for a value nothing can measure. */
     {.key = "bat_pin", .type = SET_INT, .def = "11", .label = "Sense GPIO (ADC)",

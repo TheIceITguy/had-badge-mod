@@ -298,10 +298,17 @@ face up and face down.
 
 ### The battery cannot be measured on this board at all
 
-This is not a missing setting, it is a missing circuit. Every net label in the upstream schematic is
-accounted for by the keyboard, the LCD, the radio, the SAO header, USB and the power rails, and there
-is no sense net: `VBAT` reaches the MCP73831 charger and the AP2112K regulator and never an MCU pin.
-R10 and R11, the two 100k parts that look like a divider, sit around the DMG2305 load switch.
+This is not a missing setting, it is a missing circuit, and it is now traced rather than inferred.
+KiCad's own pad-level net assignments put exactly four pads on `VBAT`: the MCP73831's battery terminal
+(U2.3), the 10 uF cap C4, the drain of the DMG2305 load switch (Q2.3), and pin 2 of the JST battery
+connector J4. It reaches no MCU pin, through a divider or otherwise, and a census of all 19 resistors
+on the board finds no divider anywhere: they are pull-ups, LED series parts, USB-C CC terminations, the
+antenna network and the charger's PROG resistor. R10 (100k, VBUS to GND) is the load switch's gate
+pull-down. R11 (100k) has nothing to do with the load switch: it pulls the AP2112K enable pin up, and
+slide switch SW3 grounds that pin to turn the badge off.
+
+Charge state is not readable either. The MCP73831's `STAT` pin drives only the optional charge LED D2,
+and `VBUS` stops at the USB-C connector, the charger and the load switch without reaching an MCU pin.
 
 What this release changes is the shape of the workaround. The sidebar now hides the battery icon
 instead of showing a permanently empty one, because an empty glyph claims a flat pack while the truth

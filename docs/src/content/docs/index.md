@@ -1,6 +1,6 @@
 ---
 title: Communicator Badge firmware
-description: A C / ESP-IDF Meshtastic firmware for the Hackaday 2024 Supercon Communicator badge, with GPS, an offline map, and a tilt-compensated compass.
+description: A C / ESP-IDF Meshtastic firmware for the Hackaday Supercon 2025 Communicator badge, with GPS, an offline map, and a tilt-compensated compass.
 template: splash
 hero:
   tagline: A native C rewrite of the Communicator badge firmware. Meshtastic messaging over LoRa, with a monochrome LVGL interface and interrupt-driven peripherals.
@@ -14,7 +14,7 @@ hero:
       variant: minimal
 ---
 
-This firmware replaces the stock `lvgl_micropython` build on the Hackaday 2024 Supercon
+This firmware replaces the stock `lvgl_micropython` build on the Hackaday Supercon 2025
 Communicator badge. It is written in C against ESP-IDF, and it turns the badge into a working
 Meshtastic node: text messages over LoRa with other badges, stock Meshtastic devices, and the
 Meshtastic phone app. The on-air format is the real Meshtastic wire protocol, so packets

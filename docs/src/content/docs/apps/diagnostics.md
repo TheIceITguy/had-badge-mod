@@ -85,5 +85,5 @@ The row shows `--` when `imu_enabled` is off, since there is nothing to count.
 
 ## System
 
-- Battery: charge percentage and voltage, and whether USB power is present, or `disabled` when the badge has no battery sense configured
+- Battery: charge percentage and voltage, or `disabled` when no battery sense is configured, which is the stock state because the board has no sense circuit
 - Up/Heap: uptime and free heap

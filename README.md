@@ -1,7 +1,7 @@
 <h1 align="center">Communicator Badge firmware</h1>
 
 <p align="center">
-  Native C / ESP-IDF Meshtastic firmware for the Hackaday 2024 Supercon Communicator badge.
+  Native C / ESP-IDF Meshtastic firmware for the Hackaday Supercon 2025 Communicator badge.
 </p>
 
 <p align="center">
@@ -17,7 +17,7 @@
   <a href="https://giovi321.github.io/had-badge-mod/"><img src="https://img.shields.io/badge/Read_the_docs-2563EB?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Read the documentation"></a>
 </p>
 
-This firmware turns the Supercon 2024 Communicator badge into a Meshtastic messenger. It joins a mesh, exchanges encrypted text with other badges, Meshtastic devices, and the phone app, and drives a monochrome LVGL interface on the badge's own keyboard and screen. Twelve apps sit behind a scrolling launcher, from the chat screen to a tilt-compensated compass and an offline vector map.
+This firmware turns the Hackaday Supercon 2025 Communicator badge into a Meshtastic messenger. It joins a mesh, exchanges encrypted text with other badges, Meshtastic devices, and the phone app, and drives a monochrome LVGL interface on the badge's own keyboard and screen. Twelve apps sit behind a scrolling launcher, from the chat screen to a tilt-compensated compass and an offline vector map.
 
 > Replaces the stock `lvgl_micropython` demo. Flashing is reversible: you can put the original image back over USB whenever you want.
 
@@ -179,7 +179,7 @@ Not confirmed:
 
 - Heading accuracy. The compass reports a heading, but it has not been compared against a known reference, and the axis transform between the two dies and the calibration sweep are unproven in the field. The maths behind them is host-tested, which is a different claim
 - The magnetometer calibration gate accepts a sweep that never tilts the badge, which leaves the vertical axis offset tens of uT out. That error cancels while the badge is level and grows as it tips, so sweep with real tilt. Closing the gap properly needs a sphere-residual check
-- Battery charge. This badge has no battery sense circuit at all: `VBAT` never reaches an MCU pin, so the sidebar hides the icon rather than showing an empty one. The settings to enable it exist for anyone who adds a divider by hand
+- Battery charge. This badge has no battery sense circuit: `VBAT` reaches only the charger, a cap, the load switch and the JST connector, never an MCU pin, and there is no charge-status or USB-present line either. The sidebar hides the icon rather than showing an empty one. The settings to enable it exist for anyone who fits a divider by hand, though nobody has yet
 - Radar, the web UI tools (settings backup and restore, and OTA update), and the multi-channel threaded UI are in the build but have not had a device check
 
 ## Roadmap

@@ -1,6 +1,7 @@
 /* See drivers/battery.h. ADC oneshot; disabled unless a sense pin is configured.
- * The stock badge has no confirmed battery divider, so this stays off by default
- * until bat_adc_pin / divider are set from the schematic. */
+ * The stock badge has no battery divider at all: VBAT reaches only the charger,
+ * a cap, the load switch and the JST connector, so there is nothing to read
+ * unless the user fits one and sets bat_pin / bat_div_x100. */
 #include "drivers/battery.h"
 #include "esp_log.h"
 #include "esp_adc/adc_oneshot.h"

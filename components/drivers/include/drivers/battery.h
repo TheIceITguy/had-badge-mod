@@ -9,6 +9,9 @@ typedef struct {
     bool present;
     int pct;        /* 0..100, -1 if unknown */
     float volts;
+    /* Both unreadable on the stock board and always false: the charger's STAT pin
+     * drives only the charge LED, and VBUS never reaches an MCU pin. Kept so a
+     * badge with those signals modded in has somewhere to report them. */
     bool charging;
     bool usb;
 } battery_state_t;

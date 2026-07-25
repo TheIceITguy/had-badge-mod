@@ -43,9 +43,10 @@ static const setting_t LED_SCHEMA[] = {
 };
 
 /* Highest priority state that wants the LED. Charging and low battery belong here
- * too, and the event bus already carries them, but this board has no battery sense
- * circuit at all, so those patterns would be unreachable code until the sense pin
- * exists in hardware. */
+ * too, and the event bus already carries both events, but neither is readable on
+ * this board: there is no sense circuit for the voltage, and the charger's STAT pin
+ * drives only the charge LED, so charge state is unreadable independently of it.
+ * Both patterns need a hardware mod, not just a setting, so they stay out. */
 static bool pattern(uint32_t *on_ms, uint32_t *period_ms)
 {
     if (s_test_left_ms) { *on_ms = TEST_MS; *period_ms = TEST_MS; return true; }

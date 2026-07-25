@@ -1,4 +1,4 @@
-/* Single source of truth for every GPIO on the Hackaday 2024 Communicator badge
+/* Single source of truth for every GPIO on the Hackaday Supercon 2025 Communicator badge
  * (ESP32-S3). Ported from firmware/badge/hardware/board.py and lvgl_setup.py. */
 #ifndef BOARD_PINS_H
 #define BOARD_PINS_H

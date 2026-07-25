@@ -3,7 +3,7 @@ title: Board and pins
 description: Which GPIO each peripheral sits on, which of those pins are settings, and what moved in this release.
 ---
 
-The target is the Hackaday 2024 Supercon Communicator badge. Three optional peripherals share its
+The target is the Hackaday Supercon 2025 Communicator badge, also issued at Hackaday Europe 2026. Three optional peripherals share its
 two expansion headers, and between them they use every signal pin on both:
 
 | Peripheral | Pins | Header | Addon board socket |
@@ -67,12 +67,19 @@ whose pad order is 3V3, IO11 (ESP TX), IO12 (ESP RX), GND.
 The display and radio sit on separate SPI hosts, the display on SPI2 and the radio on SPI3, so they
 do not share a bus.
 
-This badge has no battery sense circuit: VBAT reaches the charger and the regulator and never an
-MCU pin, so nothing can read the pack as it ships. Battery reporting is therefore off by default and
-the sidebar hides the icon rather than showing an empty one. If you add a divider by hand, turn on
-`bat_enabled` and set `bat_pin` and `bat_div_x100` in Settings; no firmware edit is needed. GPIO11
-(the J6 IO11 pad) is the only ADC-capable pin left free, and it sits on ADC2, which the ESP32-S3
-cannot read while WiFi is running.
+This badge has no battery sense circuit. The `VBAT` net has four pads: the charger's battery
+terminal, a 10 uF cap, the drain of the load switch, and the JST battery connector. It never reaches an
+MCU pin, and there is no resistor divider anywhere on the board. There is no charge-status line and no
+USB-present line either, because the charger's `STAT` pin drives only the optional charge LED and
+`VBUS` stops at the USB-C connector, the charger and the load switch. Nothing about the pack is
+readable as the badge ships, so battery reporting is off by default and the sidebar hides the icon
+rather than showing an empty one.
+
+If you fit a divider by hand, turn on `bat_enabled` and set `bat_pin` and `bat_div_x100` in Settings;
+no firmware edit is needed. Every ADC1 pin (GPIO1 to GPIO10) is committed, so the free candidates are
+GPIO11 and GPIO12 on the J6 pads, and both sit on ADC2, which the ESP32-S3 cannot read while WiFi is
+running. GPIO12 is also this firmware's default motor pin. Nobody has fitted one, so treat that path
+as untested.
 
 The stock badge has no magnetometer and no real-time clock. Without an IMU the heading-up views fall
 back to GPS course over ground, so they only orient while you move, and the clock is set from the GPS
