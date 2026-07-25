@@ -4,9 +4,9 @@ v1.0.0 gives the badge a tilt-compensated compass, a vibration motor and a notif
 moves the GPS UART default off J6 to make room for them, so anyone upgrading a badge that already has
 a GPS wired to J6 must read the breaking changes before flashing. The rest is additive: the offline Map
 app, a map view in Breadcrumbs, the internal addon board, and a launcher fix that makes Radar and Map
-reachable from the home screen for the first time. The compass code is complete and host-tested, but
-it has never run against a real ICM-20948, so the heading, the axis transform and the calibration
-flow are unproven on silicon. Details in [Verification status](#verification-status).
+reachable from the home screen for the first time. An ICM-20948 is detected and
+identified on hardware, but no heading has been checked against a known bearing, so treat the compass
+as beta. Details in [Verification status](#verification-status).
 
 Previous release: v0.12.0.
 
@@ -236,9 +236,9 @@ one implementation now answers for every app.
 ## Verification status
 
 The firmware builds clean for `esp32s3`, the host suite is green, and the build boots on real
-hardware with the GPS and the motor live on their new pins. The compass has never talked to a real
-ICM-20948, and the notification LED service is newer than the binary that was flashed, so neither is
-confirmed on hardware.
+hardware with the GPS, the motor and the notification LED live on their pins. An ICM-20948 answers on
+the SAO bus and identifies itself, so the compass transport is confirmed; the heading it produces has
+not been compared against a known bearing.
 
 | Check | Result |
 |-------|--------|

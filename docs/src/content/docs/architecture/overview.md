@@ -109,10 +109,12 @@ therefore only present if the code that reads it was compiled in.
 ## What is proven and what is not
 
 The firmware builds clean for `esp32s3`, the host suite passes at 1113 checks with 0 failures,
-and a flashed badge boots with the GPS and the vibration motor coming up on their new pins.
+and a flashed badge boots with the GPS, the vibration motor and the notification LED coming up on
+their pins.
 
-The compass path has not run against a real ICM-20948. On the test badge nothing acknowledged
-on the SAO I2C bus, which is a wiring fault on that unit and not a code fault, so the heading
-output, the axis transform between the accelerometer and magnetometer dies, and the
-calibration flow are unverified on silicon. The portable maths under them is covered by 388
-host checks; the transport and the axis mapping are not.
+The compass transport is confirmed against a real ICM-20948: the part is detected, `WHO_AM_I` reads
+`0xEA`, and the AK09916 on the second die answers and enters continuous mode, which exercises the
+register map, the user-bank switching and the bypass path. Above that layer nothing is proven. No
+heading has been compared against a known bearing, and the axis mapping between the two dies and the
+calibration flow are untested in the field. The portable maths under them carries 388 host checks,
+which is a claim about the maths and not about the sensor.

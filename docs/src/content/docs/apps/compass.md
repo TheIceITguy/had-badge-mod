@@ -15,10 +15,11 @@ IMU compass enabled (`imu_enabled`) in the Compass group in Settings and restart
 any of them needs a restart. `mag_decl_ddeg` and `mag_cal_use` are re-read about once a second, so
 those two take effect while the badge runs.
 
-This page describes what the firmware does, not what a working sensor was seen to do. The compass
-path has not been confirmed against a real ICM-20948: on the badge it was written on, nothing
-acknowledged on the SAO bus, which leaves the heading output, the axis transform between the two dies
-and the calibration flow unproven on silicon.
+The sensor half of this is confirmed on hardware: an ICM-20948 on the SAO bus is detected and
+identified, `WHO_AM_I` reads `0xEA`, and the AK09916 magnetometer answers and enters continuous mode.
+The heading half is not. No reading has been compared against a known bearing, and the axis transform
+between the two dies and the calibration sweep are untested in the field, so read the heading here
+against a bearing you trust before you rely on it.
 
 ## What it shows
 
