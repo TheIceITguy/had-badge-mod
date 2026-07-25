@@ -1,4 +1,5 @@
-/* Diagnostics app: per-module status (LoRa mesh, GPS, WiFi, Bluetooth, system).
+/* Diagnostics app: per-module status (LoRa mesh, GPS, compass, WiFi, Bluetooth,
+ * system).
  *
  * The "Heard" row under LoRa counts every valid LoRa frame the radio demodulates
  * on any channel, before the channel/decrypt filter. It is the key field when
@@ -14,7 +15,10 @@
 #include "drivers/wifi.h"
 #include "drivers/battery.h"
 #include "ble/ble.h"
+#include "services/compass.h"
+#include "services/services.h"
 #include "util/gps_state.h"
+#include "util/compass.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -25,6 +29,7 @@
 enum {
     R_NODE, R_RADIO, R_CHAN, R_RXTX, R_HEARD, R_SIG, R_PEERS,
     R_GPS, R_GPS_POS, R_GPS_DATA,
+    R_CMP, R_CMP_HDG, R_CMP_TILT, R_CMP_DATA,
     R_WIFI, R_WIFI_IP,
     R_BLE,
     R_BATT, R_SYS,
@@ -85,6 +90,12 @@ static void build(lv_obj_t **screen, lv_group_t *group)
     s_val[R_GPS_POS]  = make_row(f.body, "Pos");
     s_val[R_GPS_DATA] = make_row(f.body, "Data");
 
+    make_header(f.body, "COMPASS");
+    s_val[R_CMP]      = make_row(f.body, "State");
+    s_val[R_CMP_HDG]  = make_row(f.body, "Heading");
+    s_val[R_CMP_TILT] = make_row(f.body, "Tilt");
+    s_val[R_CMP_DATA] = make_row(f.body, "Data");
+
     make_header(f.body, "WIFI");
     s_val[R_WIFI]    = make_row(f.body, "State");
     s_val[R_WIFI_IP] = make_row(f.body, "IP");
@@ -97,7 +108,7 @@ static void build(lv_obj_t **screen, lv_group_t *group)
     s_val[R_SYS]  = make_row(f.body, "Up/Heap");
 
     *screen = f.screen;
-    menubar_set_labels("", "", "", "", "");
+    menubar_set_labels("Buzz", "LED", "", "", "");
 }
 
 static void tick(void)
@@ -158,6 +169,84 @@ static void tick(void)
         lv_label_set_text(s_val[R_GPS_DATA], b);
     }
 
+    /* --- Compass --- */
+    compass_status_t cst;
+    compass_get_status(&cst);
+    /* One state, published by the service, so this page and the Compass app cannot
+     * disagree about what is wrong. */
+    compass_state_t cstate = cst.state;
+    switch (cstate) {
+    case COMPASS_STATE_OFF:
+        /* Only two causes reach here: the setting is off, or it is on and nothing
+         * answered at boot. A silent magnetometer die still leaves the sampling
+         * task running, so it reports as "no magnetometer" below, not here. */
+        lv_label_set_text(s_val[R_CMP], cst.enabled ? "no IMU on SAO" : "disabled");
+        lv_label_set_text(s_val[R_CMP_HDG], "--");
+        break;
+    case COMPASS_STATE_NO_DATA:
+        /* A missing AK09916 also lands here, because the accelerometer half
+         * answers and only the fused sample never appears -- name the die
+         * instead of leaving the user to suspect the whole part. */
+        lv_label_set_text(s_val[R_CMP], cst.mag_present ? "no data" : "no magnetometer");
+        lv_label_set_text(s_val[R_CMP_HDG], "--");
+        break;
+    case COMPASS_STATE_UNCAL:
+        if (cst.cal_active) {
+            snprintf(b, sizeof b, "calibrating, %lu%s", (unsigned long)cst.cal_samples,
+                     cst.cal_ready ? " (ready)" : "");
+            lv_label_set_text(s_val[R_CMP], b);
+        } else {
+            /* A stored calibration that mag_cal_use is ignoring reaches here too,
+             * and "uncalibrated" would send that user off to sweep again. */
+            lv_label_set_text(s_val[R_CMP], cst.cal_stored && !cst.cal_in_use
+                                            ? "cal saved, unused" : "uncalibrated");
+        }
+        lv_label_set_text(s_val[R_CMP_HDG], "--");   /* nothing is published yet */
+        break;
+    case COMPASS_STATE_OK:
+        lv_label_set_text(s_val[R_CMP], "ok");
+        /* Magnetic and declination next to the true heading: a heading that is
+         * off by a constant is a wrong declination, and only this row shows it. */
+        snprintf(b, sizeof b, "%.0f true  mag %.0f  dec %+.1f",
+                 cst.reading.heading_deg, cst.reading.magnetic_deg, cst.declination_deg);
+        lv_label_set_text(s_val[R_CMP_HDG], b);
+        break;
+    }
+    /* Roll/pitch need the accelerometer only and carry their own freshness, so
+     * they must not hang off the fused state: with a dead magnetometer this row is
+     * the one that proves the other die is alive. */
+    if (cst.ms_since_tilt < COMPASS_NO_DATA_MS) {   /* UINT32_MAX = never, so it fails too */
+        snprintf(b, sizeof b, "roll %.0f  pitch %.0f",
+                 cst.reading.roll_deg, cst.reading.pitch_deg);
+        lv_label_set_text(s_val[R_CMP_TILT], b);
+    } else {
+        lv_label_set_text(s_val[R_CMP_TILT], "--");
+    }
+    /* Transport counters beside the fused ones, GPS-row style. The error count is
+     * the driver's, not the service's: only the driver sees a mag-only I2C failure
+     * (imu_read still returns a good accelerometer sample), and a valid WHO_AM_I
+     * with reads and errors both climbing while smp stays 0 is a magnetometer die
+     * that is not soldered down. */
+    if (cstate == COMPASS_STATE_OFF && !cst.enabled) {
+        lv_label_set_text(s_val[R_CMP_DATA], "--");
+    } else if (cstate == COMPASS_STATE_OFF) {
+        /* Enabled but bring-up failed: the raw WHO_AM_I separates an empty bus
+         * (00) from something answering that is not an ICM-20948. */
+        snprintf(b, sizeof b, "id %02X, no reads", cst.imu_whoami);
+        lv_label_set_text(s_val[R_CMP_DATA], b);
+    } else if (cst.ms_since_sample == UINT32_MAX) {
+        snprintf(b, sizeof b, "id %02X  %lu rd, %lu e  %lu smp, none yet",
+                 cst.imu_whoami, (unsigned long)cst.imu_reads,
+                 (unsigned long)cst.imu_errors, (unsigned long)cst.samples);
+        lv_label_set_text(s_val[R_CMP_DATA], b);
+    } else {
+        snprintf(b, sizeof b, "id %02X  %lu rd, %lu e  %lu smp, %lus",
+                 cst.imu_whoami, (unsigned long)cst.imu_reads,
+                 (unsigned long)cst.imu_errors, (unsigned long)cst.samples,
+                 (unsigned long)(cst.ms_since_sample / 1000));
+        lv_label_set_text(s_val[R_CMP_DATA], b);
+    }
+
     /* --- WiFi --- */
     char st[24]; int wr = 0; bool wrv = false;
     wifi_get_state(st, sizeof st, &wr, &wrv);
@@ -185,11 +274,21 @@ static void tick(void)
     lv_label_set_text(s_val[R_SYS], b);
 }
 
+/* The motor and the LED are the two peripherals whose wiring cannot be confirmed
+ * by reading a row: either they move and light up or the joint is bad. F1 and F2
+ * fire them once so the answer takes a keypress instead of a message from
+ * someone else. Both are no-ops when the feature is off in Settings. */
+static void on_fkey(int n)
+{
+    if (n == 1) vibe_svc_test();
+    else if (n == 2) led_svc_test();
+}
+
 const app_def_t *app_diag(void)
 {
     static const app_def_t def = {
         .name = "Diag", .icon = LV_SYMBOL_EYE_OPEN,
-        .build = build, .tick = tick,
+        .build = build, .on_fkey = on_fkey, .tick = tick,
     };
     return &def;
 }

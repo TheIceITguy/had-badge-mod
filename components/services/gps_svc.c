@@ -5,10 +5,12 @@
 #include "esp_log.h"
 
 static const setting_t GPS_SCHEMA[] = {
-    {.key = "gps_enabled", .type = SET_BOOL, .def = "false", .label = "GPS enabled", .group = "GPS"},
-    {.key = "gps_rx_pin",  .type = SET_INT,  .def = "12", .label = "GPS RX pin (ESP)", .group = "GPS",
+    {.key = "gps_enabled", .type = SET_BOOL, .def = "true", .label = "GPS enabled", .group = "GPS"},
+    /* Defaults are the SAO spare pins, not J6: see the GPS block in board_pins.h
+     * for why, and set 12/11 to go back to J6. */
+    {.key = "gps_rx_pin",  .type = SET_INT,  .def = "7", .label = "GPS RX pin (ESP)", .group = "GPS",
      .minv = 0, .maxv = 48, .has_min = true, .has_max = true},
-    {.key = "gps_tx_pin",  .type = SET_INT,  .def = "11", .label = "GPS TX pin (ESP)", .group = "GPS",
+    {.key = "gps_tx_pin",  .type = SET_INT,  .def = "6", .label = "GPS TX pin (ESP)", .group = "GPS",
      .minv = 0, .maxv = 48, .has_min = true, .has_max = true},
 };
 

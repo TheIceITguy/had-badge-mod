@@ -1,11 +1,12 @@
 /* Radar app ("Find my people"): a PPI scope with you at the centre and every
  * node that has reported a position drawn as a blip at its range and bearing.
  *
- * The badge has no magnetometer yet, so the scope is north-up when you are
- * stopped and heading-up (from GPS course) while you move -- the same rule the
- * Tracker and Follow apps use. scope_up() is the single seam an IMU compass
- * would later replace. The range-and-bearing projection lives in
- * util/radar_proj.c so it can be host-tested without LVGL. */
+ * In heading-up mode the scope turns with the tilt-compensated compass, which
+ * holds standing still; with no compass heading it falls back to GPS course
+ * over ground while moving, and to north-up when neither is usable. scope_up()
+ * defers to compass_pick_up() so every heading-up view arbitrates the same way.
+ * The range-and-bearing projection lives in util/radar_proj.c so it can be
+ * host-tested without LVGL. */
 #include "apps/app_iface.h"
 #include "ui/frame.h"
 #include "ui/theme.h"
@@ -15,6 +16,8 @@
 #include "net/message.h"
 #include "core/nodedb.h"
 #include "drivers/gps.h"
+#include "services/compass.h"
+#include "util/compass.h"
 #include "util/geo.h"
 #include "util/radar_proj.h"
 #include "ui/map_canvas.h"
@@ -37,7 +40,7 @@ static const double RANGES[] = {200.0, 1000.0, 5000.0, -1.0};
 
 static lv_obj_t *s_area, *s_title, *s_info;
 static lv_obj_t *s_blip[BLIP_MAX];
-static int s_mode;          /* 0 = north-up, 1 = heading-up (when moving) */
+static int s_mode;          /* 0 = north-up, 1 = heading-up (compass or course) */
 static int s_range_idx;     /* index into RANGES */
 static uint32_t s_sel;      /* highlighted node, 0 = none */
 
@@ -91,14 +94,14 @@ static uint32_t next_positioned_num(uint32_t after)
     return 0;
 }
 
-/* Scope up direction in true degrees: heading-up (GPS course) while moving,
- * north-up otherwise. Returns false if there is no usable heading (stopped). */
-static bool scope_up(const gps_fix_t *fix, double *up_deg)
+/* Scope up direction in true degrees: the compass first, then GPS course while
+ * moving, north-up otherwise. Returns which source won. */
+static compass_src_t scope_up(const gps_fix_t *fix, double *up_deg)
 {
-    bool moving = fix->has_course && fix->speed > 1.0;   /* knots */
-    if (s_mode == 1 && moving) { *up_deg = fix->course; return true; }
-    *up_deg = 0.0;
-    return false;
+    compass_reading_t c;
+    bool ok = compass_get(&c);
+    return compass_pick_up(s_mode == 1, ok, c.heading_deg,
+                           fix->has_course, fix->speed, fix->course, up_deg);
 }
 
 static void set_labels(void)
@@ -198,7 +201,7 @@ static void tick(void)
     }
 
     double up;
-    bool headingup = scope_up(&fix, &up);
+    compass_src_t src = scope_up(&fix, &up);
     nodedb_t *db = net_nodedb();
 
     /* Resolve the range the rim represents (auto = farthest node, 200 m floor). */
@@ -244,9 +247,16 @@ static void tick(void)
 
     char rs[16];
     fmt_dist(range, rs, sizeof rs);
-    char t[48];
+    /* The wording is util/compass's job so every heading-up view names the same
+     * fallback the same way: "move" is only honest advice when there is no
+     * compass to wait for, and a stored-but-disabled calibration must not send
+     * the user off to sweep what is already swept. */
+    compass_status_t st;
+    compass_get_status(&st);
+    compass_hint_t hint = compass_hint(src, st.state, st.cal_stored, st.cal_in_use);
+    char t[48];   /* worst case: "North up (cal off)  -  " (23) + range (<=15) */
     snprintf(t, sizeof t, "%s  -  %s",
-             s_mode ? (headingup ? "Heading up" : "North up (move)") : "North up", rs);
+             compass_up_label(s_mode == 1, src, hint), rs);
     lv_label_set_text(s_title, t);
 
     char info[200];

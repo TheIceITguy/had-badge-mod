@@ -1,9 +1,11 @@
-/* Map app: a full-screen offline map. You-centered by default (north-up when
- * stopped, heading-up from GPS course while moving, the same rule as radar's
- * scope_up -- the seam a real magnetometer would later feed). F3 unlocks free
- * panning with the arrow keys; F3 again re-centers on you. Roads/water come from
- * the offline /spiffs/map.vmap; your recorded trail and positioned mesh nodes
- * are drawn on top. All rendering is the shared ui/map_canvas widget. */
+/* Map app: a full-screen offline map. You-centered by default; in heading-up
+ * mode the view turns with the tilt-compensated compass, falls back to GPS
+ * course over ground while moving, and stays north-up when neither is usable
+ * (view_up() shares that arbitration with radar's scope_up through
+ * compass_pick_up). F3 unlocks free panning with the arrow keys; F3 again
+ * re-centers on you. Roads/water come from the offline /spiffs/map.vmap; your
+ * recorded trail and positioned mesh nodes are drawn on top. All rendering is
+ * the shared ui/map_canvas widget. */
 #include "apps/app_iface.h"
 #include "ui/frame.h"
 #include "ui/theme.h"
@@ -14,7 +16,9 @@
 #include "net/backend.h"
 #include "core/nodedb.h"
 #include "drivers/gps.h"
+#include "services/compass.h"
 #include "services/track.h"
+#include "util/compass.h"
 #include "util/vmap.h"
 
 #include <math.h>
@@ -29,7 +33,7 @@ static const double RANGES[] = {100.0, 200.0, 500.0, 1000.0, 2000.0};
 
 static map_canvas_t *s_mc;
 static lv_obj_t *s_info;
-static int s_mode;              /* 0 = north-up, 1 = heading-up while moving */
+static int s_mode;              /* 0 = north-up, 1 = heading-up (compass or course) */
 static int s_range_idx = 2;     /* default 500 m */
 static bool s_pan;              /* free-pan mode */
 static bool s_pan_seeded;       /* s_pan_lat/lon hold a meaningful point */
@@ -49,13 +53,14 @@ static void fmt_dist(double m, char *out, int cap)
     else snprintf(out, cap, "%.0f m", m);
 }
 
-/* North-up unless moving in heading-up mode, in which case up = GPS course. */
-static bool view_up(const gps_fix_t *fix, double *up)
+/* View up in true degrees: the compass first, then GPS course while moving,
+ * north-up otherwise. Returns which source won. */
+static compass_src_t view_up(const gps_fix_t *fix, double *up)
 {
-    bool moving = fix->has_course && fix->speed > 1.0;   /* knots */
-    if (s_mode == 1 && moving) { *up = fix->course; return true; }
-    *up = 0.0;
-    return false;
+    compass_reading_t c;
+    bool ok = compass_get(&c);
+    return compass_pick_up(s_mode == 1, ok, c.heading_deg,
+                           fix->has_course, fix->speed, fix->course, up);
 }
 
 /* Centre of the loaded map file, to seed pan mode when there is no GPS fix. */
@@ -175,8 +180,11 @@ static void tick(void)
     }
 
     double clat, clon, up;
+    compass_src_t src = COMPASS_SRC_NONE;
+    /* Panning stays north-up on purpose: a view that turns with your heading
+     * while the arrows walk the centre away from you is impossible to steer. */
     if (s_pan) { clat = s_pan_lat; clon = s_pan_lon; up = 0.0; }
-    else { clat = fix.lat; clon = fix.lon; view_up(&fix, &up); }
+    else { clat = fix.lat; clon = fix.lon; src = view_up(&fix, &up); }
 
     map_canvas_set_view(s_mc, clat, clon, up, range);
     if (map_canvas_view_dirty(s_mc)) {
@@ -196,8 +204,15 @@ static void tick(void)
 
     char rs[16];
     fmt_dist(range, rs, sizeof rs);
+    /* The wording is util/compass's job so every heading-up view names the same
+     * fallback the same way: "move" is only honest advice when there is no
+     * compass to wait for, and a stored-but-disabled calibration must not send
+     * the user off to sweep what is already swept. */
+    compass_status_t st;
+    compass_get_status(&st);
+    compass_hint_t hint = compass_hint(src, st.state, st.cal_stored, st.cal_in_use);
     char info[96];
-    const char *m = s_pan ? "Pan" : (s_mode ? "Head up" : "North up");
+    const char *m = s_pan ? "Pan" : compass_up_label(s_mode == 1, src, hint);
     snprintf(info, sizeof info, "%s  %s%s", m, rs,
              map_canvas_present(s_mc) ? "" : "  (no map)");
     lv_label_set_text(s_info, info);

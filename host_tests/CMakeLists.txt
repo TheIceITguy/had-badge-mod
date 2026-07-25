@@ -33,7 +33,8 @@ set(PORTABLE
     ${ROOT}/components/util/geo.c
     ${ROOT}/components/util/radar_proj.c
     ${ROOT}/components/util/map_proj.c
-    ${ROOT}/components/util/vmap.c)
+    ${ROOT}/components/util/vmap.c
+    ${ROOT}/components/util/compass.c)
 
 file(GLOB TESTS ${CMAKE_CURRENT_LIST_DIR}/*.c)
 

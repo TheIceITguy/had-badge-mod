@@ -43,7 +43,7 @@ typedef struct settings_store {
 } settings_store_t;
 
 #ifndef SETTINGS_MAX
-#define SETTINGS_MAX 48
+#define SETTINGS_MAX 64
 #endif
 
 typedef struct {
