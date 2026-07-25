@@ -1,8 +1,7 @@
 # Upstream reference clone (kept locally, not part of this repo)
 /upstream/
 
-# Local agent/editor state
-/.claude/
+# Local editor state
 .vscode/
 .idea/
 
