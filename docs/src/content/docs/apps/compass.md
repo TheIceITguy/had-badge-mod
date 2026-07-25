@@ -6,7 +6,7 @@ description: The tilt-compensated heading the rest of the firmware orients by, p
 Compass shows the heading every orienting view in the firmware is using, and runs the magnetometer
 calibration sweep that makes that heading worth reading. It needs the optional ICM-20948 on the SAO
 header J8, which is not fitted from the factory. See
-[Board and pins](/had-badge-mod/hardware/overview/#sao-expansion-and-imu) for the wiring, then turn on
+[Compass and IMU](/had-badge-mod/hardware/compass/) for the wiring, then turn on
 IMU compass enabled (`imu_enabled`) in the Compass group in Settings and restart the badge.
 
 ![Compass: state Ready, heading 274 degrees true reading west, source Compass, and a calibration saved and in use](../../../assets/screen-compass.svg)

@@ -36,7 +36,7 @@ The Data row is the quickest way to tell whether the module is talking at all. I
 
 These rows cover the optional ICM-20948 on the SAO header. See
 [Compass](/had-badge-mod/apps/compass/) for the app and
-[Board and pins](/had-badge-mod/hardware/overview/) for the wiring.
+[Compass and IMU](/had-badge-mod/hardware/compass/) for the wiring.
 
 | Row | What it reads |
 |-----|---------------|

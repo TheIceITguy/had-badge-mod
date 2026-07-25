@@ -32,8 +32,11 @@ export default defineConfig({
           label: 'Hardware',
           items: [
             { label: 'Board and pins', link: '/hardware/overview/' },
-            { label: 'Case and enclosure', link: '/hardware/case/' },
+            { label: 'Compass and IMU', link: '/hardware/compass/' },
+            { label: 'GPS module', link: '/hardware/gps/' },
+            { label: 'Vibration motor and LED', link: '/hardware/vibration-and-led/' },
             { label: 'Internal addon board', link: '/hardware/internal-addon-board/' },
+            { label: 'Case and enclosure', link: '/hardware/case/' },
           ],
         },
         {

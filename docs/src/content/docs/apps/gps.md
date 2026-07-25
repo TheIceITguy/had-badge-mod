@@ -6,36 +6,11 @@ description: Read the current position from an attached GPS module, and wire it 
 The GPS app shows the current fix from an ATGM336H module. The module is optional, and the receiver is
 brought up at boot, so a wiring or pin change needs a restart.
 
-## Wiring
+## Wiring lives on the hardware page
 
-The default is the SAO header's two spare signal pins, because the compass takes the SAO I2C pair and
-J6's IO12 drives the vibration motor:
-
-| Signal | SAO pin | ESP32-S3 | Addon board |
-|--------|---------|----------|-------------|
-| 3V3 | J8 pin 1 | - | J2, J5 or J6 |
-| GND | J8 pin 2 | - | J2, J5 or J6 |
-| ESP RX from module TX | SAO_GPIO1, J8 pin 5 | GPIO7 | J3 pin 1 |
-| ESP TX to module RX | SAO_GPIO2, J8 pin 6 | GPIO6 | J3 pin 2 |
-
-So the module's TX goes to SAO_GPIO1 (GPIO7) and its RX to SAO_GPIO2 (GPIO6). Note the numbering
-inversion: SAO_GPIO1 is ESP GPIO7 and SAO_GPIO2 is ESP GPIO6, which is an easy pair to swap by
-mistake.
-
-J8 is not populated from the factory, so solder to the pads or fit a header for the addon board.
-
-### Using J6 instead
-
-The original wiring still works, since both pins are settings. On J6 the pads are 3V3, IO11 (ESP TX),
-IO12 (ESP RX), GND, so the module's TX goes to J6 pin 3 and its RX to J6 pin 2. Set GPS RX pin
-(`gps_rx_pin`) to 12 and GPS TX pin (`gps_tx_pin`) to 11 and reboot. The IO12 silkscreen is easy to
-misread as "IO10"; GPIO10 is the LoRa antenna switch and is not on that header. If the vibration motor
-is enabled on its default GPIO12, turn it off or move it first, because the two cannot share the pad.
-
-Because the RX and TX pins are settings, you do not have to match the default wiring. If the GPS page
-shows `No data - check wiring`, the TX and RX are almost certainly swapped: either swap the two data
-wires, or, without touching the wiring, swap the pin numbers in Settings (set GPS RX pin to the pad
-your module's TX is on and GPS TX pin to the module's RX pad) and reboot.
+The module, the default pins (ESP RX on GPIO7, ESP TX on GPIO6), the J6 alternative and the mounting
+notes are on [GPS module](/had-badge-mod/hardware/gps/). GPS is enabled by default, and the receiver is
+brought up at boot, so a wiring or pin change needs a restart.
 
 ## What it shows
 
