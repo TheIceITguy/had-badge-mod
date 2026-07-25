@@ -1,10 +1,13 @@
 # Internal addon board
 
-A small PCB that mounts on the back (battery side) of the Communicator badge main board. It solders onto the two expansion headers J8 (SAO) and J6 (GPS/expansion) and breaks them out to JST connectors, so internal peripherals can be plugged instead of soldered. The lower part of the board is a plain tab that gets hot-glued to the badge.
+A small PCB that turns the badge's two expansion headers into JST sockets, so internal peripherals
+plug in instead of being soldered to loose wires. It mounts on the back (battery side) of the
+Communicator badge main board, soldered onto J8 (SAO) and J6 (GPS/expansion). The lower part of the
+board is a plain tab that gets hot-glued to the badge.
 
 Full documentation: [Internal addon board](https://giovi321.github.io/had-badge-mod/hardware/internal-addon-board/) on the docs site.
 
-All badge geometry in this folder is extracted from the official KiCad design at [Hack-a-Day/2025-Communicator_Badge](https://github.com/Hack-a-Day/2025-Communicator_Badge) (`hardware/communicator_pcb/communicator_pcb.kicad_pcb`, MIT license) and x-mirrored to the back view. Nothing is drawn by eye.
+All badge geometry in this folder is extracted from the official KiCad design at [Hack-a-Day/2025-Communicator_Badge](https://github.com/Hack-a-Day/2025-Communicator_Badge) (`hardware/communicator_pcb/communicator_pcb.kicad_pcb`, MIT license) and x-mirrored to the back view, so every dimension is a file value.
 
 ## Files
 
@@ -40,18 +43,18 @@ Hole sizes: J8 drill 1.016 mm, pad 1.727 mm. J6 drill 1.0 mm, pad 1.7 mm.
 
 ## Addon board sockets
 
-The board re-exposes the badge signals as six 2-pin sockets at 2 mm pitch, one functional pair per socket, so each module plugs one power pair plus the signal pair it needs and modules can be mixed and matched without soldering. Socket references below are the addon board's own J1-J6, not the badge headers.
+The board re-exposes the badge pins as six 2-pin sockets at 2 mm pitch, one functional pair per socket. Each module plugs into one power pair plus the signal pair it needs, so modules can be mixed and swapped without soldering. Socket references below are the addon board's own J1-J6, not the badge headers.
 
 | Socket | Pair | Pin 1 | Pin 2 |
 |--------|------|-------|-------|
-| J1 | UART | IO12 (into badge) | IO11 (out of badge) |
+| J1 | UART | IO12 (into badge; vibration motor by default) | IO11 (out of badge) |
 | J2 | power | GND | 3V3 |
-| J3 | GPIO | GPIO7 | GPIO6 |
-| J4 | I2C | SDA (GPIO4) | SCL (GPIO5) |
+| J3 | GPIO | GPIO7 (GPS TX in by default) | GPIO6 (GPS RX out) |
+| J4 | I2C | SDA (GPIO4, compass) | SCL (GPIO5) |
 | J5 | power | 3V3 | GND |
 | J6 | power | 3V3 | GND |
 
-Note that J2 carries 3V3 on the opposite pin to J5/J6 (as routed in the sketch); check each socket's polarity against its silkscreen before plugging polarized cables.
+J2 carries 3V3 on the opposite pin to J5/J6 (as routed in the sketch), so check each socket's polarity against its silkscreen before plugging polarized cables.
 
 ## Hole coordinates (badge back view)
 

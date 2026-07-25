@@ -56,6 +56,7 @@ export default defineConfig({
             { label: 'Tracker', link: '/apps/tracker/' },
             { label: 'Find my people (Radar)', link: '/apps/radar/' },
             { label: 'Map', link: '/apps/map/' },
+            { label: 'Compass', link: '/apps/compass/' },
             { label: 'Packets', link: '/apps/packets/' },
           ],
         },
