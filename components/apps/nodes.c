@@ -1,4 +1,7 @@
-/* Nodes app: list of heard Meshtastic nodes (name, SNR, age). */
+/* Nodes app: list of heard Meshtastic nodes (name, SNR, age), each with a needle
+ * pointing at the node once both ends have a position. The needles are
+ * heading-relative (IMU compass, GPS course while moving, else north-up), so
+ * tick() re-aims the drawn ones as you turn instead of re-rendering the list. */
 #include "apps/app_iface.h"
 #include "apps/app_manager.h"
 #include "ui/frame.h"
@@ -8,8 +11,10 @@
 #include "net/backend.h"
 #include "net/message.h"
 #include "services/services.h"
+#include "services/compass.h"
 #include "drivers/gps.h"
 #include "util/geo.h"
+#include "util/compass.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -18,12 +23,7 @@
 #include "core/nodedb.h"
 
 #define FPI 3.14159265358979323846
-
-static const char *cardinal(double brg)
-{
-    static const char *c[] = {"N", "NE", "E", "SE", "S", "SW", "W", "NW"};
-    return c[((int)((brg + 22.5) / 45.0)) % 8];
-}
+#define REAIM_DEG 4.0   /* heading change worth repainting the needles for */
 
 static lv_obj_t *s_list;
 static lv_group_t *s_group;
@@ -31,6 +31,11 @@ static int s_rendered = -1;
 /* Persistent point storage for the per-row bearing needles (lv_line keeps the
  * pointer, it does not copy). Re-rendered rows reuse the same slots. */
 static lv_point_precise_t s_arrow_pts[NODEDB_CAP][2];
+/* The drawn needles, so a turn can re-aim them without rebuilding the rows.
+ * NULL for a row that has none; every entry is stale after lv_obj_clean. */
+static lv_obj_t *s_arrow[NODEDB_CAP];
+static double s_arrow_brg[NODEDB_CAP];   /* the bearing each row's text shows */
+static double s_up;                      /* heading the drawn needles are aimed against */
 
 static uint32_t focused_num(void)
 {
@@ -66,14 +71,38 @@ static void node_key(lv_event_t *e)
 }
 static void node_click(lv_event_t *e) { (void)e; message_focused(); }
 
+/* Where the top of every row needle points. The rows carry no north-up toggle of
+ * their own, so they take the best heading going: compass, GPS course while
+ * moving, north-up (up = 0) with neither. */
+static compass_src_t row_up(const gps_fix_t *fix, double *up)
+{
+    compass_reading_t c;
+    bool ok = compass_get(&c);
+    return compass_pick_up(true, ok, c.heading_deg,
+                           fix->has_course, fix->speed, fix->course, up);
+}
+
+/* Aim one drawn needle `rel` degrees clockwise from the top of its 26px box. */
+static void aim_needle(int i, double rel)
+{
+    double th = rel * FPI / 180.0;
+    s_arrow_pts[i][0].x = 13;            s_arrow_pts[i][0].y = 13;
+    s_arrow_pts[i][1].x = 13.0 + 11.0 * sin(th);
+    s_arrow_pts[i][1].y = 13.0 - 11.0 * cos(th);
+    lv_line_set_points(s_arrow[i], s_arrow_pts[i], 2);   /* also invalidates */
+}
+
 static void render(void)
 {
     nodedb_t *db = net_nodedb();
     uint32_t keep = focused_num();   /* keep focus/scroll across re-renders */
     lv_obj_clean(s_list);
+    memset(s_arrow, 0, sizeof s_arrow);   /* the clean above deleted them all */
     uint32_t now = (uint32_t)time(NULL);
     gps_fix_t fix;
     bool havegps = gps_get_fix(&fix) && fix.valid;
+    s_up = 0.0;
+    if (havegps) row_up(&fix, &s_up);
 
     if (db->count == 0) {
         lv_obj_t *empty = lv_label_create(s_list);
@@ -95,20 +124,21 @@ static void render(void)
          * fix. The needle (right) points the same bearing graphically. */
         line2[0] = 0;
         bool show_arrow = false;
-        double rel = 0;
+        double brg = 0, rel = 0;
         if (r->has_position) {
             double nlat = r->lat_i / 1e7, nlon = r->lon_i / 1e7;
             char nav[44] = "";
             if (havegps) {
                 double dist = geo_distance_m(fix.lat, fix.lon, nlat, nlon);
-                double brg = geo_bearing_deg(fix.lat, fix.lon, nlat, nlon);
+                brg = geo_bearing_deg(fix.lat, fix.lon, nlat, nlon);
                 char ds[16];
                 if (dist >= 1000.0) snprintf(ds, sizeof ds, "%.1fkm", dist / 1000.0);
                 else snprintf(ds, sizeof ds, "%.0fm", dist);
-                snprintf(nav, sizeof nav, "   %s  %.0f %s", ds, brg, cardinal(brg));
-                /* relative to travel while moving (a heading to steer), else north-up */
-                bool moving = fix.has_course && fix.speed > 1.0;
-                rel = fmod((moving ? brg - fix.course : brg) + 360.0, 360.0);
+                snprintf(nav, sizeof nav, "   %s  %.0f %s", ds, brg,
+                         compass_cardinal(brg));
+                /* The printed bearing stays true north; the needle is turned into
+                 * the current heading, so it is a direction to walk. */
+                rel = compass_wrap360(brg - s_up);
                 show_arrow = true;
             }
             snprintf(line2, sizeof line2, LV_SYMBOL_GPS " %.5f, %.5f%s", nlat, nlon, nav);
@@ -148,10 +178,6 @@ static void render(void)
         }
 
         if (show_arrow && i < NODEDB_CAP) {                 /* bearing needle */
-            double th = rel * FPI / 180.0;
-            s_arrow_pts[i][0].x = 13;            s_arrow_pts[i][0].y = 13;
-            s_arrow_pts[i][1].x = 13.0 + 11.0 * sin(th);
-            s_arrow_pts[i][1].y = 13.0 - 11.0 * cos(th);
             lv_obj_t *box = lv_obj_create(btn);
             lv_obj_set_size(box, 26, 26);
             lv_obj_set_style_bg_color(box, theme_hex(C_SURFACE_2), 0);
@@ -161,10 +187,12 @@ static void render(void)
             lv_obj_set_style_radius(box, LV_RADIUS_CIRCLE, 0);
             lv_obj_remove_flag(box, LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_t *needle = lv_line_create(box);
-            lv_line_set_points(needle, s_arrow_pts[i], 2);
             lv_obj_set_style_line_width(needle, 3, 0);
             lv_obj_set_style_line_color(needle, theme_hex(C_ACCENT), 0);
             lv_obj_set_style_line_rounded(needle, true, 0);
+            s_arrow[i] = needle;
+            s_arrow_brg[i] = brg;
+            aim_needle(i, rel);
         }
 
         if (s_group) lv_group_add_obj(s_group, btn);
@@ -205,7 +233,22 @@ static void build(lv_obj_t **screen, lv_group_t *group)
 
 static void tick(void)
 {
-    if (net_peer_count() != s_rendered) render();
+    if (net_peer_count() != s_rendered) { render(); return; }
+
+    /* Turning in place invalidates every needle while the node count -- the only
+     * thing that used to trigger a render -- stands still. A render() would fix
+     * them by rebuilding the rows, which costs the focus and the scroll position,
+     * so the drawn needles are re-aimed in place instead: no objects created or
+     * destroyed, nothing touched but the line points. The gate keeps compass
+     * jitter from repainting the list at the 10 Hz tick rate. */
+    gps_fix_t fix;
+    if (!gps_get_fix(&fix) || !fix.valid) return;   /* no fix, so no needles exist */
+    double up = 0.0;
+    row_up(&fix, &up);
+    if (compass_ang_diff(up, s_up) < REAIM_DEG) return;
+    s_up = up;
+    for (int i = 0; i < NODEDB_CAP; i++)
+        if (s_arrow[i]) aim_needle(i, compass_wrap360(s_arrow_brg[i] - up));
 }
 
 static void on_fkey(int n)

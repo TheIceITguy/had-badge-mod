@@ -1,16 +1,18 @@
 /* Follow app: load the most recent track and point a needle back along it.
  *
- * The badge has no magnetometer, so heading comes from GPS course over ground.
- * The needle is relative to your direction of travel while you move, and falls
- * back to north-up when you are stopped. */
+ * Heading comes from the IMU compass, which is valid standing still -- the state
+ * you are in while reading the dial. Without a compass the needle falls back to
+ * GPS course over ground while you move, and to north-up when you are stopped. */
 #include "apps/app_iface.h"
 #include "ui/frame.h"
 #include "ui/theme.h"
 #include "ui/colors.h"
 #include "ui/menubar.h"
 #include "services/track.h"
+#include "services/compass.h"
 #include "drivers/gps.h"
 #include "util/geo.h"
+#include "util/compass.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -133,20 +135,49 @@ static void tick(void)
     }
 
     double brg = geo_bearing_deg(fix.lat, fix.lon, s_lat[s_target], s_lon[s_target]);
-    bool moving = fix.has_course && fix.speed > 1.0;   /* knots */
-    double rel = moving ? brg - fix.course : brg;
-    rel = fmod(rel + 360.0, 360.0);
+    /* No north-up toggle here either, so take the best heading going: compass,
+     * GPS course while moving, north-up (up = 0) with neither. The status
+     * snapshot carries the heading and, when there is none, the reason, so one
+     * copy serves the needle and the wording below. */
+    compass_status_t st;
+    compass_get_status(&st);
+    double up = 0.0;
+    compass_src_t src = compass_pick_up(true, st.reading.valid, st.reading.heading_deg,
+                                        fix.has_course, fix.speed, fix.course, &up);
+    double rel = compass_wrap360(brg - up);
     double th = rel * FPI / 180.0;
     s_pts[1].x = CX + NEEDLE_R * sin(th);
     s_pts[1].y = CY - NEEDLE_R * cos(th);
     lv_line_set_points(s_needle, s_pts, 2);
+
+    /* Name the frame the needle is drawn in. North-up has four causes and each
+     * wants a different action, so the cause word is the shared one (the wording
+     * Radar, Map and Compass show) and only the clause after it is this app's:
+     * an uncalibrated magnetometer wants a sweep, not a walk. */
+    compass_hint_t hint = compass_hint(src, st.state, st.cal_stored, st.cal_in_use);
+    char frame[72];
+    if (src == COMPASS_SRC_MAG) {
+        snprintf(frame, sizeof frame, "compass up, point the badge");
+    } else if (src == COMPASS_SRC_GPS) {
+        snprintf(frame, sizeof frame, "relative to travel");
+    } else {
+        const char *act;
+        switch (hint) {
+        case COMPASS_HINT_CAL:     act = "sweep the badge in the Compass app"; break;
+        case COMPASS_HINT_CAL_OFF: act = "enable mag_cal_use in Settings"; break;
+        case COMPASS_HINT_WAIT:    act = "the compass has no samples yet"; break;
+        case COMPASS_HINT_MOVE:
+        default:                   act = "no compass, walk to aim the needle"; break;
+        }
+        snprintf(frame, sizeof frame, "north up, %s: %s", compass_hint_text(hint), act);
+    }
 
     char b[180];
     if (s_target == 0 && dt < ARRIVE_M) {
         snprintf(b, sizeof b, "Back at the start.");
     } else {
         snprintf(b, sizeof b, "To waypoint: %.0f m\nBearing %.0f deg\nWaypoint %d of %d\n%s",
-                 dt, brg, s_target + 1, s_n, moving ? "relative to travel" : "north up, move to orient");
+                 dt, brg, s_target + 1, s_n, frame);
     }
     lv_label_set_text(s_info, b);
     lv_label_set_text(s_file, s_loaded);

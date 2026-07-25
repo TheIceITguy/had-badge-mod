@@ -16,6 +16,7 @@ static const char *TAG = "track";
 
 #define MIN_MOVE_M   8.0    /* record a point after moving this far ... */
 #define MAX_GAP_S    30     /* ... or at least this often while stopped */
+#define RING_CAP     512    /* most-recent trail points kept in RAM for map views */
 
 static FILE *s_file;
 static volatile bool s_active;
@@ -25,9 +26,35 @@ static double s_last_lat, s_last_lon;
 static uint32_t s_last_ts;
 static SemaphoreHandle_t s_mtx;
 
+/* Bounded ring of recent points for the map overlays. Guarded by s_mtx. */
+static geo_pt_t s_ring[RING_CAP];
+static int s_ring_head;      /* index of the next write */
+static int s_ring_len;       /* valid points, <= RING_CAP */
+
+/* Append one point. Caller holds s_mtx. */
+static void ring_push(double lat, double lon)
+{
+    s_ring[s_ring_head].lat = lat;
+    s_ring[s_ring_head].lon = lon;
+    s_ring_head = (s_ring_head + 1) % RING_CAP;
+    if (s_ring_len < RING_CAP) s_ring_len++;
+}
+
 bool track_is_active(void) { return s_active; }
 int track_point_count(void) { return s_count; }
 const char *track_filename(void) { return s_name; }
+
+int track_get_points(geo_pt_t *out, int cap)
+{
+    if (!out || cap <= 0 || !s_mtx) return 0;
+    xSemaphoreTake(s_mtx, portMAX_DELAY);
+    int n = s_ring_len < cap ? s_ring_len : cap;
+    int start = (s_ring_head - n + RING_CAP) % RING_CAP;   /* oldest of the n */
+    for (int i = 0; i < n; i++)
+        out[i] = s_ring[(start + i) % RING_CAP];
+    xSemaphoreGive(s_mtx);
+    return n;
+}
 
 bool track_start(void)
 {
@@ -51,6 +78,8 @@ bool track_start(void)
     }
     s_count = 0;
     s_last_ts = 0;
+    s_ring_head = 0;
+    s_ring_len = 0;
     s_active = (s_file != NULL);
     bool ok = s_active;
     xSemaphoreGive(s_mtx);
@@ -90,6 +119,7 @@ static void track_task(void *arg)
                     fix.lat, fix.lon, (long)fix.alt, fix.sats);
             fflush(s_file);
             s_count++;
+            ring_push(fix.lat, fix.lon);
             s_last_lat = fix.lat;
             s_last_lon = fix.lon;
             s_last_ts = now;

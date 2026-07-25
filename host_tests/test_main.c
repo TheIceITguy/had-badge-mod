@@ -25,6 +25,7 @@ SUITE_DECL(run_nmea);
 SUITE_DECL(run_gps);
 SUITE_DECL(run_geo);
 SUITE_DECL(run_radar);
+SUITE_DECL(run_compass);
 SUITE_DECL(run_map);
 SUITE_DECL(run_theme_layout);
 
@@ -47,6 +48,7 @@ int main(void)
     RUN(run_gps);
     RUN(run_geo);
     RUN(run_radar);
+    RUN(run_compass);
     RUN(run_map);
     RUN(run_theme_layout);
 

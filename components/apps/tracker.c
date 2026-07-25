@@ -3,6 +3,10 @@
  * transmits: distance and bearing from you, the node's own speed and heading,
  * and any environment telemetry (temperature, humidity) it sends.
  *
+ * The needle is oriented by the IMU compass, so it stays live while you stand
+ * still, which is when you are pointing the badge at someone. With no compass it
+ * falls back to GPS course while moving, and to north-up when stopped.
+ *
  * This shares the compass needle with the Follow app and the node positions and
  * telemetry the backend already collects. The difference is the target: a live
  * node from the node DB rather than a saved breadcrumb track. */
@@ -14,8 +18,10 @@
 #include "net/backend.h"
 #include "net/message.h"
 #include "core/nodedb.h"
+#include "services/compass.h"
 #include "drivers/gps.h"
 #include "util/geo.h"
+#include "util/compass.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -162,9 +168,16 @@ static void tick(void)
 
     double dist = geo_distance_m(fix.lat, fix.lon, nlat, nlon);
     double brg = geo_bearing_deg(fix.lat, fix.lon, nlat, nlon);
-    bool moving = fix.has_course && fix.speed > 1.0;   /* knots */
-    double rel = moving ? brg - fix.course : brg;
-    rel = fmod(rel + 360.0, 360.0);
+    /* The dial has no north-up toggle of its own, so it takes the best heading
+     * going: compass, GPS course while moving, north-up (up = 0) with neither.
+     * One status snapshot answers both questions, the heading and (below) why
+     * there is none, so the tick does not copy the service state twice. */
+    compass_status_t st;
+    compass_get_status(&st);
+    double up = 0.0;
+    compass_src_t src = compass_pick_up(true, st.reading.valid, st.reading.heading_deg,
+                                        fix.has_course, fix.speed, fix.course, &up);
+    double rel = compass_wrap360(brg - up);
     double th = rel * FPI / 180.0;
     s_pts[1].x = CX + NEEDLE_R * sin(th);
     s_pts[1].y = CY - NEEDLE_R * cos(th);
@@ -174,9 +187,34 @@ static void tick(void)
     if (dist >= 1000.0) snprintf(ds, sizeof ds, "%.2f km", dist / 1000.0);
     else snprintf(ds, sizeof ds, "%.0f m", dist);
 
+    /* Say what the needle is measured against. Four different things leave it
+     * north-up and each wants a different action, so the cause word comes from
+     * the shared hint (the wording Radar, Map and Compass show) and only the
+     * clause after it is this app's. Telling someone with an uncalibrated
+     * magnetometer to walk would send them off after a heading that will never
+     * arrive. */
+    compass_hint_t hint = compass_hint(src, st.state, st.cal_stored, st.cal_in_use);
+    char frame[72];
+    if (src == COMPASS_SRC_MAG) {
+        snprintf(frame, sizeof frame, "(compass up, point the badge)\n");
+    } else if (src == COMPASS_SRC_GPS) {
+        snprintf(frame, sizeof frame, "(relative to travel)\n");
+    } else {
+        const char *act;
+        switch (hint) {
+        case COMPASS_HINT_CAL:     act = "sweep in the Compass app"; break;
+        case COMPASS_HINT_CAL_OFF: act = "enable mag_cal_use in Settings"; break;
+        case COMPASS_HINT_WAIT:    act = "no samples yet"; break;
+        case COMPASS_HINT_MOVE:
+        default:                   act = "no compass, walk to aim it"; break;
+        }
+        snprintf(frame, sizeof frame, "(north up, %s: %s)\n",
+                 compass_hint_text(hint), act);
+    }
+
     char b[300];
     snprintf(b, sizeof b, "%s away, bearing %.0f\n%s%sUpdated %lds ago",
-             ds, brg, extra, moving ? "" : "(north up, move to orient)\n", age);
+             ds, brg, extra, frame, age);
     lv_label_set_text(s_info, b);
 }
 

@@ -33,6 +33,7 @@ export default defineConfig({
           items: [
             { label: 'Board and pins', link: '/hardware/overview/' },
             { label: 'Case and enclosure', link: '/hardware/case/' },
+            { label: 'Internal addon board', link: '/hardware/internal-addon-board/' },
           ],
         },
         {
@@ -54,6 +55,8 @@ export default defineConfig({
             { label: 'Breadcrumbs and Follow', link: '/apps/breadcrumbs/' },
             { label: 'Tracker', link: '/apps/tracker/' },
             { label: 'Find my people (Radar)', link: '/apps/radar/' },
+            { label: 'Map', link: '/apps/map/' },
+            { label: 'Compass', link: '/apps/compass/' },
             { label: 'Packets', link: '/apps/packets/' },
           ],
         },

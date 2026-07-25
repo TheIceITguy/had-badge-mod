@@ -106,6 +106,44 @@ void run_map(void)
         CHECK_NEAR(ay, 90, 0.01);
     }
 
+    /* ---- segment / rectangle clip (full-screen map) -------------------- */
+    SUITE("map/clip-rect");
+    {
+        float ax, ay, bx, by;
+        const float lo = 10, hi = 90;          /* box [10,90] x [10,90] */
+
+        /* Fully inside: returned unchanged. */
+        CHECK(map_clip_segment_rect(20, 50, 80, 50, lo, lo, hi, hi, &ax, &ay, &bx, &by));
+        CHECK_NEAR(ax, 20, 0.01); CHECK_NEAR(bx, 80, 0.01);
+
+        /* Fully outside to the right. */
+        CHECK(!map_clip_segment_rect(100, 50, 120, 50, lo, lo, hi, hi, &ax, &ay, &bx, &by));
+
+        /* Centre to far right -> exits at x = 90. */
+        CHECK(map_clip_segment_rect(50, 50, 150, 50, lo, lo, hi, hi, &ax, &ay, &bx, &by));
+        CHECK_NEAR(ax, 50, 0.01); CHECK_NEAR(bx, 90, 0.01);
+
+        /* Chord across both vertical edges -> enters 10, exits 90. */
+        CHECK(map_clip_segment_rect(0, 50, 100, 50, lo, lo, hi, hi, &ax, &ay, &bx, &by));
+        CHECK_NEAR(ax, 10, 0.01); CHECK_NEAR(bx, 90, 0.01);
+
+        /* Diagonal through the box -> clipped corner to corner. */
+        CHECK(map_clip_segment_rect(0, 0, 100, 100, lo, lo, hi, hi, &ax, &ay, &bx, &by));
+        CHECK_NEAR(ax, 10, 0.01); CHECK_NEAR(ay, 10, 0.01);
+        CHECK_NEAR(bx, 90, 0.01); CHECK_NEAR(by, 90, 0.01);
+
+        /* Degenerate point inside / outside. */
+        CHECK(map_clip_segment_rect(50, 50, 50, 50, lo, lo, hi, hi, &ax, &ay, &bx, &by));
+        CHECK(!map_clip_segment_rect(200, 200, 200, 200, lo, lo, hi, hi, &ax, &ay, &bx, &by));
+
+        /* Vertical line outside the left edge (parallel to L/R edges). */
+        CHECK(!map_clip_segment_rect(5, 0, 5, 100, lo, lo, hi, hi, &ax, &ay, &bx, &by));
+
+        /* On the top edge (inclusive) -> kept, clipped in x to [10,90]. */
+        CHECK(map_clip_segment_rect(0, 10, 100, 10, lo, lo, hi, hi, &ax, &ay, &bx, &by));
+        CHECK_NEAR(ax, 10, 0.01); CHECK_NEAR(bx, 90, 0.01); CHECK_NEAR(ay, 10, 0.01);
+    }
+
     /* ---- view bbox + overlap ------------------------------------------- */
     SUITE("map/bbox");
     {

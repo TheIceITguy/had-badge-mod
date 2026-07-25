@@ -36,6 +36,8 @@ const app_def_t *app_follow(void);
 const app_def_t *app_packets(void);
 const app_def_t *app_tracker(void);
 const app_def_t *app_radar(void);
+const app_def_t *app_map(void);
+const app_def_t *app_compass(void);
 
 /* Subscribe the messages app to the event bus + load saved history (call once
  * at boot). */

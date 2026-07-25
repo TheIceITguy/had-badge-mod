@@ -82,12 +82,15 @@ void app_main(void)
     if (radio_task_start() != ESP_OK) ESP_LOGW(TAG, "radio unavailable");
 
     /* 5. Services (register their own settings, start tasks/timers). */
-    battery_svc_init();
+    battery_svc_init(&s_settings);
     gps_svc_init(&s_settings);
+    compass_svc_init(&s_settings);
     time_svc_init();
     mesh_svc_init(&s_settings);
     track_svc_init();
     wifi_svc_init(&s_settings);
+    vibe_svc_init(&s_settings, &s_bus);
+    led_svc_init(&s_settings, &s_bus);
     {
         char sn[16];
         settings_get_str(&s_settings, "short_name", sn, sizeof sn);

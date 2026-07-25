@@ -21,7 +21,7 @@
 #define SIDEBAR_H     (SCREEN_H - BOTTOMBAR_H)   /* 124: stops at the bar */
 #define CONTENT_X     SIDEBAR_W                  /* 28 */
 #define CONTENT_W     (SCREEN_W - SIDEBAR_W)     /* 400 */
-#define CONTENT_Y     HEADER_H                   /* 20 */
+#define CONTENT_Y     HEADER_H                   /* 14 */
 #define CONTENT_BOTTOM (SCREEN_H - BOTTOMBAR_H)  /* 124 */
 #define BODY_H        (CONTENT_BOTTOM - HEADER_H)/* 104 */
 

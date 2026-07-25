@@ -11,8 +11,13 @@
 #include <string.h>
 #include "esp_app_desc.h"
 
+/* Headroom over the registered app count: a tile short of it is silently
+ * unreachable from the home screen (Radar and Map already were), and the strip
+ * scrolls horizontally, so more tiles cost nothing but this array. */
+#define TILE_MAX 16
+
 static launcher_select_cb s_cb;
-static strip_item_t s_items[8];
+static strip_item_t s_items[TILE_MAX];
 
 static void on_strip(int index, void *ctx) { (void)ctx; if (s_cb) s_cb(index); }
 
@@ -21,7 +26,7 @@ void launcher_build(lv_obj_t **screen, lv_group_t *group,
                     int initial_focus)
 {
     s_cb = cb;
-    if (n > 8) n = 8;
+    if (n > TILE_MAX) n = TILE_MAX;
     for (int i = 0; i < n; i++) { s_items[i].name = apps[i]->name; s_items[i].icon = apps[i]->icon; }
 
     static frame_t f;

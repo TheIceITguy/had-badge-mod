@@ -52,10 +52,17 @@ void sidebar_update(const status_snapshot_t *s)
 {
     if (!s_bar) return;
 
-    /* Battery */
-    lv_label_set_text(s_batt, icon_battery(s->batt_present ? s->batt_pct : -1, s->charging));
-    long bc = theme_battery_fill_color(s->batt_present ? s->batt_pct : -1, s->charging, s->batt_present);
-    lv_obj_set_style_text_color(s_batt, theme_hex(bc == C_NONE ? C_IDLE : bc), 0);
+    /* Battery. With no sense circuit fitted there is no charge to report, and an
+     * empty-looking battery glyph reads as a flat pack rather than as a missing
+     * measurement, so the icon is hidden outright instead of shown greyed. */
+    if (!s->batt_present) {
+        lv_obj_add_flag(s_batt, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_remove_flag(s_batt, LV_OBJ_FLAG_HIDDEN);
+        lv_label_set_text(s_batt, icon_battery(s->batt_pct, s->charging));
+        long bc = theme_battery_fill_color(s->batt_pct, s->charging, true);
+        lv_obj_set_style_text_color(s_batt, theme_hex(bc == C_NONE ? C_IDLE : bc), 0);
+    }
 
     /* Mesh */
     int ml = theme_mesh_level(s->mesh_up, s->mesh_peers);
