@@ -15,9 +15,17 @@ the screen, the calibration sweep and what each state means.
 
 The ICM-20948 is a 3-axis accelerometer and gyroscope, plus an AK09916 magnetometer on a second die
 inside the same package. Its I2C address is `0x68`, or `0x69` when AD0 is tied high, so there is no
-clash with the keyboard's TCA8418 at `0x34`. The magnetometer has its own fixed address, `0x0C`, and
-the driver puts the ICM in bypass so it appears as a second device on the same bus. The bus runs at
-400 kHz.
+clash with the keyboard's TCA8418 at `0x34`. The bus runs at 400 kHz.
+
+The magnetometer is not on this bus. It has its own fixed address, `0x0C`, on a private bus behind the
+ICM, and the driver reaches it through the ICM's auxiliary I2C master: one channel (SLV4) for single
+configuration transactions, another (SLV0) as a standing order that re-reads the nine data registers
+on a schedule and leaves them in the ICM's shadow registers, where a normal read collects them.
+
+The alternative is bypass mode, which connects the magnetometer's pins to the main bus so it looks
+like a second device. That path is a trap. It reads the identity and control registers perfectly,
+which makes it look correct, while returning measurements that are not fields. See
+[Troubleshooting](/had-badge-mod/development/troubleshooting/#the-heading-jumps-constantly-even-after-a-calibration-sweep).
 
 Only the accelerometer and the magnetometer produce the heading. The gyroscope and the die temperature
 are read but do not feed it, which is what makes the heading valid when the badge is still.
@@ -137,9 +145,19 @@ reasons applies: no compass, nothing calibrated, a calibration switched off, or 
 ## What has been verified
 
 An ICM-20948 on this bus is detected and identified on hardware: `WHO_AM_I` reads `0xEA`, and the
-AK09916 on the second die answers and enters continuous mode. That exercises the register map, the
-user-bank switching and the bypass path against the real part.
+AK09916 answers over the auxiliary master, accepts a soft reset, enters continuous mode and streams
+into the shadow registers. That exercises the register map, the user-bank switching, both aux channels
+and the self-test against the real part. The accelerometer reads a steady 1.0 g, so roll and pitch are
+good.
 
-The heading itself has not been checked against a known bearing, and the axis transform between the
-two dies and the calibration sweep are untested in the field. Read the heading against a bearing you
-trust before relying on it.
+The magnetometer is not yet trustworthy on the test badge. Readings carry roughly 200 to 400 uT of
+spread on every axis when the part is stationary, against an earth field of 25 to 65 uT, so the
+firmware suppresses the heading rather than publishing a bearing derived from it. Eliminated by
+measurement so far: the access path, the bus speed, the aux master's poll rate, byte order, the
+register map, read synchronisation, backlight interference, and the calibration and heading maths.
+The spread varies with sample rate, which points at a high-frequency disturbance being aliased into
+the samples rather than at the part. Three modules from two suppliers behave the same way.
+
+The heading has therefore never been checked against a known bearing, and the axis transform between
+the two dies is untested in the field. Read the heading against a bearing you trust before relying
+on it.

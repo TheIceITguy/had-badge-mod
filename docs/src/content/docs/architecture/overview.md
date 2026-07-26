@@ -114,7 +114,7 @@ their pins.
 
 The compass transport is confirmed against a real ICM-20948: the part is detected, `WHO_AM_I` reads
 `0xEA`, and the AK09916 on the second die answers and enters continuous mode, which exercises the
-register map, the user-bank switching and the bypass path. Above that layer nothing is proven. No
+register map, the user-bank switching and the ICM's auxiliary I2C master path. Above that layer nothing is proven. No
 heading has been compared against a known bearing, and the axis mapping between the two dies and the
 calibration flow are untested in the field. The portable maths under them carries 388 host checks,
 which is a claim about the maths and not about the sensor.

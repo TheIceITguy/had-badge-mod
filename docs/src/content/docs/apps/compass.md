@@ -75,9 +75,9 @@ nothing to calibrate.
 
 Calibration cannot fix a magnetometer that is not measuring, and the two faults look identical from
 this page: both give a heading that will not settle. F3 in the Diagnostics app tells them apart. It
-runs the AK09916 self-test, which measures a field produced by a coil on the sensor's own die, so
-the expected counts are fixed by the datasheet and owe nothing to the room. Everything else that
-breaks a heading leaves that test passing.
+runs the AK09916 self-test, which energises a coil on the sensor's own die, so the datasheet fixes
+the counts a healthy part returns. The measurement is the coil field plus the ambient one, so a
+strong field nearby fails it too, but the size and shape of the failure tells the two apart.
 
 Run it before sweeping again if the heading is unstable. See
 [Troubleshooting](/had-badge-mod/development/troubleshooting/#the-heading-jumps-constantly-even-after-a-calibration-sweep)

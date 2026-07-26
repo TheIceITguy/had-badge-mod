@@ -1,7 +1,9 @@
-/* See drivers/imu.h. ICM-20948 over the new I2C master driver; AK09916 via bypass. */
+/* See drivers/imu.h. ICM-20948 over the new I2C master driver; the AK09916
+ * magnetometer through the ICM's auxiliary I2C master, not through bypass. */
 #include "drivers/imu.h"
 #include "board_pins.h"
 
+#include <math.h>
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -23,13 +25,25 @@ static const char *TAG = "imu";
 #define B2_GYRO_CONFIG_1   0x01
 #define B2_ACCEL_CONFIG    0x14
 #define B0_EXT_SLV_DATA_00 0x3B   /* where the aux master parks what it read */
-#define B3_I2C_MST_ODR_CFG 0x00
+#define B0_I2C_MST_STATUS  0x17   /* SLV4_DONE is bit 6, SLV4_NACK bit 4 */
+#define B3_I2C_SLV4_ADDR   0x13   /* the one-shot channel: address, register, */
+#define B3_I2C_SLV4_REG    0x14   /* control, data-out, data-in */
+#define B3_I2C_SLV4_CTRL   0x15
+#define B3_I2C_SLV4_DO     0x16
+#define B3_I2C_SLV4_DI     0x17
+#define MST_SLV4_DONE      0x40
+#define MST_SLV4_NACK      0x10
+#define SLV4_EN            0x80
+#define USER_CTRL_MST_RST  0x02   /* I2C_MST_RST, clears a wedged aux master */
+#define LP_CONFIG_MST_CYCLE 0x40  /* reset value: the aux master polls on a duty cycle */
+#define B3_I2C_MST_ODR_CFG 0x00   /* aux master repeat rate: 1.1 kHz >> this */
 #define B3_I2C_MST_CTRL    0x01
 #define B3_I2C_SLV0_ADDR   0x03
 #define B3_I2C_SLV0_REG    0x04
 #define B3_I2C_SLV0_CTRL   0x05
 #define USER_CTRL_MST_ON   0x20   /* I2C_MST_EN */
 #define MST_CTRL_345KHZ    0x17   /* 345.6 kHz + P_NSR stop-between-reads */
+#define MST_ODR_69HZ       0x04   /* 1.1 kHz / 2^4, just under the mag's 100 Hz */
 #define SLV0_READ_FLAG     0x80   /* OR into the address for a read transfer */
 #define SLV0_EN            0x80   /* OR into CTRL with the byte count */
 
@@ -38,8 +52,6 @@ static const char *TAG = "imu";
 #define PWR1_DEVICE_RESET  0x80   /* section 8.4, self-clearing */
 #define PWR1_CLKSEL_AUTO   0x01   /* CLKSEL 1..5 = PLL when ready, else internal */
 #define PWR2_ALL_ON        0x00   /* section 8.5, DISABLE_ACCEL/GYRO both 000 */
-#define USER_CTRL_MST_OFF  0x00   /* clears I2C_MST_EN (bit 5), section 8.2 */
-#define INT_PIN_BYPASS_EN  0x02   /* BYPASS_EN (bit 1), section 8.6 */
 #define GYRO_CFG_250DPS    0x31   /* DLPFCFG 6 (5.7 Hz), FS_SEL 0, FCHOICE 1 */
 #define ACCEL_CFG_2G       0x31   /* DLPFCFG 6 (5.7 Hz), FS_SEL 0, FCHOICE 1 */
 #define AG_BURST           14
@@ -47,7 +59,8 @@ static const char *TAG = "imu";
 /* AK09916 magnetometer: a second die with its own I2C address, wired to the
  * ICM's auxiliary pins (DS-000189 sections 12 and 13, AK09916 datasheet). */
 #define MAG_I2C_ADDR       0x0C   /* fixed in the package, no strap to read */
-#define M_WIA1             0x00   /* company id, then device id at 0x01 */
+#define M_WIA1             0x00   /* company id */
+#define M_WIA2             0x01   /* device id */
 #define M_ST1              0x10   /* first of 9: ST1, HXL..HZH, dummy, ST2 */
 #define M_CNTL2            0x31
 #define M_CNTL3            0x32
@@ -69,7 +82,7 @@ static const char *TAG = "imu";
 #define TEMP_LSB_PER_C     333.87    /* table 5 */
 #define TEMP_OFFSET_C      21.0      /* the temperature at which the offset is 0 LSB */
 
-static i2c_master_dev_handle_t s_dev, s_mag;
+static i2c_master_dev_handle_t s_dev;
 static bool s_present, s_mag_present;
 static uint8_t s_whoami;
 static uint32_t s_reads, s_errors;
@@ -108,6 +121,69 @@ static void report_bus(i2c_master_bus_handle_t bus)
                       " (0x68 MPU-6050, 0x70 MPU-6500, 0x71 MPU-9250, 0x73 MPU-9255)", who);
 }
 
+/* --- reaching the AK09916 through the ICM's auxiliary master ----------------
+ * The magnetometer sits on a private I2C bus behind the ICM, so every access is
+ * a transaction the ICM performs on our behalf. Two channels are used, for two
+ * different jobs:
+ *
+ *   SLV4 is a one-shot: write address, register and (for a write) the byte, then
+ *   poll SLV4_DONE. Configuration only, because it costs a round trip per byte.
+ *
+ *   SLV0 is a standing order: once armed it re-reads the same block on the ICM's
+ *   own schedule and drops it in EXT_SLV_SENS_DATA_00, so imu_read() picks up
+ *   nine bytes from the ICM with no aux traffic of its own.
+ *
+ * I2C_MST_CYCLE in LP_CONFIG is what drives that schedule, so it is left at its
+ * reset value. Clearing it stops the standing order dead: the ICM keeps
+ * answering, EXT_SLV_SENS_DATA stays all zeroes, and I2C_MST_STATUS reports no
+ * error because from the master's point of view nothing was ever asked of it. */
+
+#define SLV4_TIMEOUT_MS 20   /* one aux transaction at 345 kHz is tens of us */
+
+static esp_err_t slv4_txn(uint8_t reg, uint8_t *val, bool read)
+{
+    bank_sel(3);
+    reg_write(s_dev, B3_I2C_SLV4_ADDR,
+              (uint8_t)(read ? (SLV0_READ_FLAG | MAG_I2C_ADDR) : MAG_I2C_ADDR));
+    reg_write(s_dev, B3_I2C_SLV4_REG, reg);
+    if (!read) reg_write(s_dev, B3_I2C_SLV4_DO, *val);
+    /* EN only. DLY 0, no INT, REG_DIS clear so the register address is sent. */
+    reg_write(s_dev, B3_I2C_SLV4_CTRL, SLV4_EN);
+
+    bank_sel(0);
+    uint8_t st = 0;
+    for (int waited = 0; waited < SLV4_TIMEOUT_MS; waited++) {
+        if (reg_read(s_dev, B0_I2C_MST_STATUS, &st, 1) != ESP_OK) return ESP_FAIL;
+        if (st & MST_SLV4_DONE) break;
+        vTaskDelay(1);
+    }
+    if (!(st & MST_SLV4_DONE)) return ESP_ERR_TIMEOUT;
+    /* A NACK means the aux bus answered nothing, which is a different fault from
+     * a transaction that never ran, and only this bit separates them. */
+    if (st & MST_SLV4_NACK) return ESP_ERR_NOT_FOUND;
+
+    if (read) {
+        bank_sel(3);
+        esp_err_t e = reg_read(s_dev, B3_I2C_SLV4_DI, val, 1);
+        bank_sel(0);
+        return e;
+    }
+    return ESP_OK;
+}
+
+static esp_err_t mag_write(uint8_t reg, uint8_t val) { return slv4_txn(reg, &val, false); }
+static esp_err_t mag_read(uint8_t reg, uint8_t *val) { return slv4_txn(reg, val, true); }
+
+/* Arm or disarm the standing order that keeps EXT_SLV_SENS_DATA fed. */
+static void mag_stream(bool on)
+{
+    bank_sel(3);
+    reg_write(s_dev, B3_I2C_SLV0_ADDR, (uint8_t)(SLV0_READ_FLAG | MAG_I2C_ADDR));
+    reg_write(s_dev, B3_I2C_SLV0_REG, M_ST1);
+    reg_write(s_dev, B3_I2C_SLV0_CTRL, on ? (uint8_t)(SLV0_EN | MAG_BURST) : 0x00);
+    bank_sel(0);
+}
+
 /* Accel, gyro and temperature are big-endian; the magnetometer is little-endian. */
 static int16_t be16(const uint8_t *p) { return (int16_t)((p[0] << 8) | p[1]); }
 static int16_t le16(const uint8_t *p) { return (int16_t)((p[1] << 8) | p[0]); }
@@ -139,13 +215,16 @@ esp_err_t imu_init(int sda_pin, int scl_pin, int addr)
     e = i2c_master_bus_add_device(bus, &dev_cfg, &s_dev);
     if (e != ESP_OK) { ESP_LOGE(TAG, "i2c dev: %s", esp_err_to_name(e)); return e; }
 
-    /* Bypass (below) puts the magnetometer on this same bus, so it is a plain
-     * second device. Reaching it through the ICM's aux master instead would mean
-     * standing up a slave-proxy state machine and reading it out of a shadow
-     * buffer, for a sensor this driver only ever polls. */
-    dev_cfg.device_address = MAG_I2C_ADDR;
-    e = i2c_master_bus_add_device(bus, &dev_cfg, &s_mag);
-    if (e != ESP_OK) { ESP_LOGE(TAG, "i2c mag dev: %s", esp_err_to_name(e)); return e; }
+    /* The magnetometer is deliberately NOT added as a device on this bus. It could
+     * be, through BYPASS_EN, and that path reads its identity and control
+     * registers perfectly -- which is exactly what makes it a trap. On this badge
+     * every measurement that came back through bypass was noise, while WIA, CNTL2
+     * and CNTL3 all read back correctly, and the AK09916's own self-test failed
+     * against a field generated on its own die. Three modules from two suppliers
+     * behaved identically, so the part was not the problem: the access path was.
+     * Every working driver for this package (SparkFun, Pimoroni, InvenSense's own)
+     * reaches the AK09916 through the ICM's auxiliary master instead, which is
+     * what the code below does. */
 
     /* Bank discipline: every block below names its bank before touching a
      * register, and init leaves bank 0 selected. imu_read() then reads only
@@ -185,34 +264,69 @@ esp_err_t imu_init(int sda_pin, int scl_pin, int addr)
     reg_write(s_dev, B2_ACCEL_CONFIG, ACCEL_CFG_2G);
     bank_sel(0);
 
-    /* BYPASS_EN only connects the aux pins to this bus while the aux I2C master
-     * is disabled (section 8.6), so clear I2C_MST_EN first. */
-    reg_write(s_dev, B0_USER_CTRL, USER_CTRL_MST_OFF);
-    reg_write(s_dev, B0_INT_PIN_CFG, INT_PIN_BYPASS_EN);
+    /* BYPASS_EN and the aux master are mutually exclusive (section 8.6), and this
+     * driver wants the master: clear bypass first so the aux pins come back under
+     * the ICM's control, then reset the master in case earlier firmware left a
+     * transaction half finished. */
+    reg_write(s_dev, B0_INT_PIN_CFG, 0x00);
+    reg_write(s_dev, B0_USER_CTRL, USER_CTRL_MST_RST);
+    vTaskDelay(pdMS_TO_TICKS(10));
 
-    /* Soft reset leaves the AK09916 in power-down with known registers, then
-     * both id bytes are read in one go (they auto-increment 0x00 -> 0x01). */
-    reg_write(s_mag, M_CNTL3, M_CNTL3_SRST);
-    vTaskDelay(pdMS_TO_TICKS(1));
+    /* I2C_MST_CYCLE stays set. It is the reset value and it is what makes the
+     * master poll SLV0 at all; clearing it leaves the shadow buffer permanently
+     * zero with no error reported anywhere. */
+    reg_write(s_dev, B0_LP_CONFIG, LP_CONFIG_MST_CYCLE);
+    bank_sel(3);
+    reg_write(s_dev, B3_I2C_MST_CTRL, MST_CTRL_345KHZ);
+    /* How often the master repeats the standing order: 1.1 kHz >> ODR. The reset
+     * value of 0 polls a 100 Hz magnetometer eleven times per measurement, and
+     * every one of those reads ST2, which is the register that tells the die its
+     * data has been consumed. Measured spread across this setting on real hardware:
+     * 440 uT at 1.1 kHz against 200 uT at 69 Hz, so the over-polling was corrupting
+     * roughly half the reading. 69 Hz still delivers three samples per 20 Hz poll. */
+    reg_write(s_dev, B3_I2C_MST_ODR_CFG, MST_ODR_69HZ);
+    bank_sel(0);
+    reg_write(s_dev, B0_USER_CTRL, USER_CTRL_MST_ON);
+    vTaskDelay(pdMS_TO_TICKS(10));
+
+    /* Identity over the aux path, retrying through a master reset. The first
+     * transaction after enabling the master is the one that fails if it was left
+     * wedged, and a single retry turns that from a dead compass into a log line. */
     uint8_t id[2] = { 0, 0 };
-    if (reg_read(s_mag, M_WIA1, id, sizeof id) != ESP_OK ||
-        id[0] != M_WIA1_AKM || id[1] != M_WIA2_AK09916) {
+    for (int try = 0; try < 3; try++) {
+        if (mag_read(M_WIA1, &id[0]) == ESP_OK && mag_read(M_WIA2, &id[1]) == ESP_OK &&
+            id[0] == M_WIA1_AKM && id[1] == M_WIA2_AK09916) {
+            s_mag_present = true;
+            break;
+        }
+        reg_write(s_dev, B0_USER_CTRL, USER_CTRL_MST_RST);
+        vTaskDelay(pdMS_TO_TICKS(10));
+        reg_write(s_dev, B0_USER_CTRL, USER_CTRL_MST_ON);
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    if (!s_mag_present) {
         /* Accel and gyro still give tilt, so keep going without a heading. */
-        ESP_LOGW(TAG, "no AK09916 (id 0x%02X%02X): no heading", id[0], id[1]);
+        ESP_LOGW(TAG, "no AK09916 over the aux master (id 0x%02X%02X): no heading",
+                 id[0], id[1]);
     } else {
         /* A mode change has to pass through power-down (AK09916 section 9.3),
-         * and Twait is 100 us; one tick is the shortest wait available. 100 Hz
-         * is the only continuous rate that always has a fresh sample ready for
-         * a 20 Hz poller -- at 10 Hz half the reads would find DRDY clear. */
-        reg_write(s_mag, M_CNTL2, M_CNTL2_POWERDOWN);
-        vTaskDelay(pdMS_TO_TICKS(1));
-        reg_write(s_mag, M_CNTL2, M_CNTL2_CONT100HZ);
-        s_mag_present = true;
+         * Twait is 100 us, and one tick is the shortest wait available. 100 Hz is
+         * the only continuous rate that always has a fresh sample ready for a
+         * 20 Hz poller: at 10 Hz half the reads would find DRDY clear. */
+        mag_write(M_CNTL3, M_CNTL3_SRST);
+        vTaskDelay(pdMS_TO_TICKS(2));
+        mag_write(M_CNTL2, M_CNTL2_POWERDOWN);
+        vTaskDelay(pdMS_TO_TICKS(2));
+        mag_write(M_CNTL2, M_CNTL2_CONT100HZ);
+        mag_stream(true);
+        vTaskDelay(pdMS_TO_TICKS(20));   /* let the first block land */
     }
 
     s_present = true;
+
     ESP_LOGI(TAG, "ICM-20948 up (id 0x%02X), magnetometer %s",
-             s_whoami, s_mag_present ? "ready at 100 Hz" : "absent");
+             s_whoami, s_mag_present ? "streaming at 100 Hz via aux master" : "absent");
     return ESP_OK;
 }
 
@@ -239,22 +353,17 @@ bool imu_read(imu_sample_t *out)
     out->mag_ok = false;
     if (!s_mag_present) return true;
 
-    /* One transaction per register, not a burst. On this bypass path a 9-byte
-     * sequential read returns data that disagrees with reading the same registers
-     * singly: it reported data-ready with non-zero values at a moment when ST1
-     * and every data register read zero. Interpreting that as a field is what
-     * produced a confident, wildly wrong heading, so the burst is not used at all.
-     * Eight short transfers at 20 Hz is 160 a second, which this bus does not
-     * notice, and ST2 is still read last so the die releases the next sample. */
+    /* One read of the ICM's shadow buffer, not of the magnetometer. The aux master
+     * has already fetched ST1 through ST2 as one block on its own schedule, so
+     * this is a plain nine-byte read from the ICM and the block is internally
+     * consistent: every byte came from the same aux transaction, which is what
+     * reading the die directly could not guarantee. */
     uint8_t m[MAG_BURST];
-    if (reg_read(s_mag, M_ST1, &m[0], 1) != ESP_OK) { s_errors++; return true; }
-    if (!(m[0] & M_ST1_DRDY)) return true;
-    for (int i = 1; i < MAG_BURST; i++) {
-        if (reg_read(s_mag, (uint8_t)(M_ST1 + i), &m[i], 1) != ESP_OK) {
-            s_errors++;
-            return true;
-        }
+    if (reg_read(s_dev, B0_EXT_SLV_DATA_00, m, sizeof m) != ESP_OK) {
+        s_errors++;
+        return true;
     }
+    if (!(m[0] & M_ST1_DRDY)) return true;
     if (m[8] & M_ST2_HOFL) return true;      /* saturated: not a field */
 
     out->mx =  le16(&m[1]) * MAG_UT_PER_LSB;
@@ -286,18 +395,23 @@ bool imu_mag_selftest(imu_mag_selftest_t *out)
     *out = (imu_mag_selftest_t){ 0 };
     if (!s_present || !s_mag_present) return false;
 
-    /* Reset first: the die is left in continuous mode by init, and a mode change
-     * has to pass through power-down anyway. */
-    reg_write(s_mag, M_CNTL3, M_CNTL3_SRST);
+    /* The standing order has to stop for the duration: it reads ST2 on every ICM
+     * sample, and that read is what tells the die to release the next
+     * measurement, so leaving it armed would consume the self-test result before
+     * this function could read it. */
+    mag_stream(false);
+    vTaskDelay(pdMS_TO_TICKS(20));
+
+    mag_write(M_CNTL3, M_CNTL3_SRST);
     vTaskDelay(pdMS_TO_TICKS(2));
     uint8_t id[2] = { 0, 0 };
-    out->id_ok = (reg_read(s_mag, M_WIA1, id, sizeof id) == ESP_OK &&
+    out->id_ok = (mag_read(M_WIA1, &id[0]) == ESP_OK && mag_read(M_WIA2, &id[1]) == ESP_OK &&
                   id[0] == M_WIA1_AKM && id[1] == M_WIA2_AK09916);
 
     for (int i = 0; i < ST_REPEATS; i++) {
-        reg_write(s_mag, M_CNTL2, M_CNTL2_POWERDOWN);
+        mag_write(M_CNTL2, M_CNTL2_POWERDOWN);
         vTaskDelay(pdMS_TO_TICKS(2));
-        if (reg_write(s_mag, M_CNTL2, M_CNTL2_SELFTEST) != ESP_OK) break;
+        if (mag_write(M_CNTL2, M_CNTL2_SELFTEST) != ESP_OK) break;
 
         /* Poll DRDY rather than assume a conversion time: a fixed delay that is
          * slightly short reads the previous contents and calls it a result. */
@@ -306,14 +420,14 @@ bool imu_mag_selftest(imu_mag_selftest_t *out)
         do {
             vTaskDelay(pdMS_TO_TICKS(2));
             waited += 2;
-            if (reg_read(s_mag, M_ST1, &st1, 1) != ESP_OK) break;
-        } while (!(st1 & M_ST1_DRDY) && waited < 60);
+            if (mag_read(M_ST1, &st1) != ESP_OK) break;
+        } while (!(st1 & M_ST1_DRDY) && waited < 200);
         if (!(st1 & M_ST1_DRDY)) continue;      /* no measurement, not a failed one */
 
-        uint8_t d[MAG_BURST - 1];               /* HXL..ST2, one transaction each */
+        uint8_t d[MAG_BURST - 1];               /* HXL..ST2, one SLV4 round trip each */
         bool ok = true;
         for (unsigned k = 0; k < sizeof d; k++)
-            if (reg_read(s_mag, (uint8_t)(M_ST1 + 1 + k), &d[k], 1) != ESP_OK) { ok = false; break; }
+            if (mag_read((uint8_t)(M_ST1 + 1 + k), &d[k]) != ESP_OK) { ok = false; break; }
         if (!ok) break;
 
         out->runs++;
@@ -328,10 +442,13 @@ bool imu_mag_selftest(imu_mag_selftest_t *out)
                  out->x, out->y, out->z);
     }
 
-    /* Back to the mode the driver samples in, whatever the verdict. */
-    reg_write(s_mag, M_CNTL2, M_CNTL2_POWERDOWN);
+    /* Back to the mode and the standing order the driver samples with, whatever
+     * the verdict: a failed self-test must not also leave the compass dead. */
+    mag_write(M_CNTL2, M_CNTL2_POWERDOWN);
     vTaskDelay(pdMS_TO_TICKS(2));
-    reg_write(s_mag, M_CNTL2, M_CNTL2_CONT100HZ);
+    mag_write(M_CNTL2, M_CNTL2_CONT100HZ);
+    mag_stream(true);
+    vTaskDelay(pdMS_TO_TICKS(20));
 
     /* Every repeat has to pass. A die that passes three of five is not a working
      * magnetometer with bad luck, it is one returning numbers that occasionally

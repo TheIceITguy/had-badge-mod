@@ -78,11 +78,10 @@ The row shows `--` when `imu_enabled` is off, since there is nothing to count.
 
 ### The Self-test row, and why it outranks the others
 
-Every other compass row can only see what the sensor reports, so none of them can tell a broken
-magnetometer from a magnetic desk. F3 settles that. The AK09916 can measure a field produced by a
-coil on its own die, so a healthy part returns nearly the same counts wherever the badge happens to
-be, and the expected windows come from the datasheet: X and Y within +/-200 counts, Z between -1000
-and -200.
+F3 energises a coil on the AK09916's own die and measures it, so the datasheet fixes the windows a
+healthy part should land in: X and Y within +/-200 counts, Z between -1000 and -200. The reading is
+the coil field plus the ambient one, so this does not isolate the sensor from its surroundings, but it
+does isolate the analogue front end from the digital path that every other row exercises.
 
 The row is blank until you press F3, because a verdict left over from a different module would be
 worse than none. After that it reads `PASS` or `FAIL`, then how many of the five repeats landed
@@ -97,11 +96,11 @@ All five repeats have to pass. A part that passes one or two is not a working ma
 bad luck, it is one returning numbers that occasionally land inside the window by chance, and the
 counts printed alongside make the difference obvious.
 
-A PASS puts the fault outside the sensor: something magnetic nearby, or a calibration that needs
-redoing. A FAIL means the die is not measuring, and calibration cannot help. Counterfeit modules and
-dead magnetometer dies are common at the low-cost end of the ICM-20948 market, and the
-accelerometer and gyroscope on the other die in the same package usually keep working, which is why
-the Tilt row above stays alive.
+Read the counts, not just the verdict. A few hundred out with Z biased negative is a real coil
+response buried in noise, so the problem is interference. Thousands out with no coil response at all
+points at the part, and calibration cannot help either way. Counterfeit modules and dead magnetometer
+dies are common at the low-cost end of the ICM-20948 market, and the accelerometer and gyroscope on
+the other die usually keep working, which is why the Tilt row above stays alive.
 
 ## WiFi
 
