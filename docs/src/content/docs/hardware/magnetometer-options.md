@@ -99,6 +99,44 @@ attenuates it inside the sensor where averaging in firmware cannot reach.
 
 ODR can stay at 100 Hz for a 20 Hz consumer, or drop to 10 Hz if the spread justifies it.
 
+### Using it
+
+The driver is written and builds; it has not met the part yet. Four settings in the Compass group
+control it, and the service reads them at boot, so a change needs a restart the way the pins do.
+
+| Setting | Default | Choices |
+|---------|---------|---------|
+| `mag_source` | `imu` | `imu` (the AK09916 in the ICM-20948), `qmc5883l` |
+| `qmc_range` | `8g` | `2g`, `8g` |
+| `qmc_osr` | `512` | `512`, `256`, `128`, `64` |
+| `qmc_odr` | `100` | `10`, `50`, `100`, `200` |
+
+Wire it to the same SDA and SCL the compass already uses, plus 3V3 and GND. `DRDY` is not connected;
+the driver polls the status register. Set `mag_source` to `qmc5883l` and restart.
+
+Nothing falls back. If `mag_source` says `qmc5883l` and no module answers at `0x0D`, the badge boots
+with no heading and says so, rather than quietly reverting to the AK09916. Reverting would present the
+fault you are trying to escape as the new module's.
+
+Two rows in Diagnostics change with this setting. **Field from** names the part and carries its own
+counters, so the Data row above is not misread as describing a magnetometer when it is describing the
+accelerometer's transport. Watch `ovl` there: it means the field went off the top of the selected
+range, so the counts are clipped rather than merely noisy and `qmc_range` is too small. **Self-test**
+reads `n/a for this part`, because only the AK09916 has a self-test coil and F3 is dropped for anything
+else.
+
+### The axis mapping is not done yet
+
+The heading fuses this part's field with the ICM's accelerometer, so both have to be in the same frame,
+and the transform depends on how the module is physically mounted. `qmc5883l_read()` currently applies
+the identity mapping, which is almost certainly wrong for whatever orientation the module ends up in.
+
+Determine it once, with the badge flat: read the Diagnostics field row while turning the badge through
+north, east, south and west, note which sensor axis tracks which badge axis and with what sign, then
+apply the swap and sign changes in `qmc5883l_read()`. Until that is done, expect the heading to be
+rotated or mirrored even with a perfectly good sensor. Roll and pitch are unaffected, since they come
+from the accelerometer alone.
+
 ## BNO055
 
 ### What it is

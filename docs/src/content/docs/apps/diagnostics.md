@@ -44,6 +44,7 @@ These rows cover the optional ICM-20948 on the SAO header. See
 | State | `disabled`, `no IMU on SAO`, `no magnetometer`, `no data`, `uncalibrated`, `cal saved, unused`, `calibrating, N` with `(ready)` once the sweep is usable, or `ok` |
 | Heading | The true heading, the magnetic heading before declination, and the declination itself, for example `276 true  mag 274  dec +2.4`. Only filled in when the State row says `ok` |
 | Tilt | Roll and pitch in degrees from the accelerometer, for example `roll -3  pitch 12` |
+| Field from | Which part measures the field, with its own counters when that is not the ICM |
 | Data | The sensor identity, the driver's I2C counters, then the fused ones, for example `id EA  1840 rd, 0 e  1840 smp, 0s` |
 | Self-test | The last magnetometer self-test verdict, blank until F3 is pressed |
 
@@ -76,6 +77,18 @@ So a valid `id EA` with `rd` climbing, `e` climbing and `smp` stuck at 0 is a ma
 not soldered down, while `e` climbing along with `rd` stuck is an I2C wiring problem on the main bus.
 The row shows `--` when `imu_enabled` is off, since there is nothing to count.
 
+### The Field from row
+
+The badge can take its field from the AK09916 inside the ICM-20948 or from a separate QMC5883L, chosen
+with `mag_source` in Settings. The accelerometer is always the ICM's, because tilt compensation needs
+it. This row says which part is in use, so the Data row above is not misread: on a badge using a
+separate magnetometer, those I2C counters describe the accelerometer's transport and nothing else.
+
+With a QMC5883L it carries that part's own counters, `rd`, `e` and `ovl`. The last one is the
+interesting one. It counts samples where the field exceeded the selected range, so the counts were
+clipped rather than merely noisy, and it means `qmc_range` needs to be larger. See
+[Magnetometer options](/had-badge-mod/hardware/magnetometer-options/).
+
 ### The Self-test row, and why it outranks the others
 
 F3 energises a coil on the AK09916's own die and measures it, so the datasheet fixes the windows a
@@ -84,7 +97,8 @@ the coil field plus the ambient one, so this does not isolate the sensor from it
 does isolate the analogue front end from the digital path that every other row exercises.
 
 The row is blank until you press F3, because a verdict left over from a different module would be
-worse than none. After that it reads `PASS` or `FAIL`, then how many of the five repeats landed
+worse than none, and reads `n/a for this part` when the field comes from anything other than the
+AK09916, since nothing else here has a self-test coil. After that it reads `PASS` or `FAIL`, then how many of the five repeats landed
 inside the windows, then the last set of counts:
 
 ```

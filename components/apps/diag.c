@@ -16,6 +16,7 @@
 #include "drivers/battery.h"
 #include "ble/ble.h"
 #include "services/compass.h"
+#include "drivers/qmc5883l.h"
 #include "services/services.h"
 #include "util/gps_state.h"
 #include "util/compass.h"
@@ -29,7 +30,7 @@
 enum {
     R_NODE, R_RADIO, R_CHAN, R_RXTX, R_HEARD, R_SIG, R_PEERS,
     R_GPS, R_GPS_POS, R_GPS_DATA,
-    R_CMP, R_CMP_HDG, R_CMP_TILT, R_CMP_DATA, R_CMP_ST,
+    R_CMP, R_CMP_HDG, R_CMP_TILT, R_CMP_SRC, R_CMP_DATA, R_CMP_ST,
     R_WIFI, R_WIFI_IP,
     R_BLE,
     R_BATT, R_SYS,
@@ -94,6 +95,7 @@ static void build(lv_obj_t **screen, lv_group_t *group)
     s_val[R_CMP]      = make_row(f.body, "State");
     s_val[R_CMP_HDG]  = make_row(f.body, "Heading");
     s_val[R_CMP_TILT] = make_row(f.body, "Tilt");
+    s_val[R_CMP_SRC]  = make_row(f.body, "Field from");
     s_val[R_CMP_DATA] = make_row(f.body, "Data");
     s_val[R_CMP_ST]   = make_row(f.body, "Self-test");
 
@@ -258,12 +260,38 @@ static void tick(void)
         lv_label_set_text(s_val[R_CMP_DATA], b);
     }
 
-    /* The self-test measures a coil on the magnetometer's own die, so its verdict
-     * is independent of the room, the wiring and the calibration. That makes it
-     * the row to read first when a heading misbehaves: every other explanation
-     * leaves this passing. Blank until F3 has been pressed, because a stale
-     * verdict from a previous module would be worse than none. */
-    if (!cst.mag_present) {
+    /* Which part is measuring the field, and its own counters. Without this row the
+     * Data row above reads as though it described the magnetometer, when on a badge
+     * using a separate part it describes the accelerometer's transport only. */
+    if (cst.mag_source == MAG_SOURCE_QMC5883L) {
+        qmc5883l_status_t q;
+        qmc5883l_get_status(&q);
+        if (!q.present) {
+            lv_label_set_text(s_val[R_CMP_SRC], "QMC5883L: none found");
+        } else {
+            /* ovl is the one to watch on this part: it means the field went off the
+             * top of the selected range, so the counts are clipped rather than
+             * merely noisy, and the range setting is too small. */
+            snprintf(b, sizeof b, "QMC5883L  %lu rd, %lu e, %lu ovl",
+                     (unsigned long)q.reads, (unsigned long)q.errors,
+                     (unsigned long)q.overflows);
+            lv_label_set_text(s_val[R_CMP_SRC], b);
+        }
+    } else if (cst.state == COMPASS_STATE_OFF && !cst.enabled) {
+        lv_label_set_text(s_val[R_CMP_SRC], "--");
+    } else {
+        lv_label_set_text(s_val[R_CMP_SRC], "AK09916 (in ICM-20948)");
+    }
+
+    /* The self-test energises a coil on the AK09916's own die, so the datasheet
+     * fixes the windows. It reads the coil plus the ambient field, so it does not
+     * isolate the part from its surroundings, but it does separate the analogue
+     * front end from the digital path every other row exercises. Blank until F3 has
+     * been pressed, because a verdict left over from a different module would be
+     * worse than none, and not offered at all for a part with no self-test coil. */
+    if (cst.mag_source != MAG_SOURCE_IMU) {
+        lv_label_set_text(s_val[R_CMP_ST], "n/a for this part");
+    } else if (!cst.mag_present) {
         lv_label_set_text(s_val[R_CMP_ST], "--");
     } else if (!cst.selftest_done) {
         lv_label_set_text(s_val[R_CMP_ST], "press F3");
@@ -316,9 +344,10 @@ static void on_fkey(int n)
 {
     if (n == 1) vibe_svc_test();
     else if (n == 2) led_svc_test();
-    /* F3 is the one compass check that does not depend on where the badge is
-     * standing, so it answers the question the other rows cannot: is the sensor
-     * broken, or is the room? */
+    /* F3 only means something for the AK09916; nothing else here has a self-test
+     * coil. The service drops the request when another part supplies the field, and
+     * the Self-test row says "n/a for this part", so the key stays unconditional
+     * rather than the menubar growing a state the label cannot show. */
     else if (n == 3) compass_selftest_begin();
 }
 

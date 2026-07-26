@@ -1,6 +1,7 @@
 /* See drivers/imu.h. ICM-20948 over the new I2C master driver; the AK09916
  * magnetometer through the ICM's auxiliary I2C master, not through bypass. */
 #include "drivers/imu.h"
+#include "drivers/i2c_bus.h"
 #include "board_pins.h"
 
 #include <math.h>
@@ -190,17 +191,11 @@ static int16_t le16(const uint8_t *p) { return (int16_t)((p[1] << 8) | p[0]); }
 
 esp_err_t imu_init(int sda_pin, int scl_pin, int addr)
 {
-    i2c_master_bus_config_t bus_cfg = {
-        .i2c_port = SAO_I2C_PORT,
-        .sda_io_num = sda_pin,
-        .scl_io_num = scl_pin,
-        .clk_source = I2C_CLK_SRC_DEFAULT,
-        .glitch_ignore_cnt = 7,
-        .flags.enable_internal_pullup = true,
-    };
+    /* Shared, because a separate magnetometer can sit on these same two pins and
+     * only one driver may create the bus (see drivers/i2c_bus.h). */
     i2c_master_bus_handle_t bus;
-    esp_err_t e = i2c_new_master_bus(&bus_cfg, &bus);
-    if (e != ESP_OK) { ESP_LOGE(TAG, "i2c bus: %s", esp_err_to_name(e)); return e; }
+    esp_err_t e = i2c_bus_get(SAO_I2C_PORT, sda_pin, scl_pin, &bus);
+    if (e != ESP_OK) return e;
 
     /* Kept because dev_cfg is reused below for the magnetometer, and a log line
      * that names the magnetometer's address while reporting the IMU is worse

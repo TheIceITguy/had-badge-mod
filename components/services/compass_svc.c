@@ -4,6 +4,7 @@
 #include "services/compass.h"
 #include "services/services.h"
 #include "drivers/imu.h"
+#include "drivers/qmc5883l.h"
 #include "util/compass.h"
 #include "board_pins.h"
 
@@ -36,6 +37,13 @@ static const char *TAG = "compass";
  * NVS. A figure-of-eight takes seconds, so two minutes is already generous. */
 #define CAL_MAX_MS     120000
 
+/* Enum choices live above the schema because the schema points at them. Order is
+ * load-bearing: the index into each array is the register field value. */
+static const char *const MAG_SOURCE_CHOICES[] = { "imu", "qmc5883l" };
+static const char *const QMC_RANGE_CHOICES[]  = { "2g", "8g" };
+static const char *const QMC_OSR_CHOICES[]    = { "512", "256", "128", "64" };
+static const char *const QMC_ODR_CHOICES[]    = { "10", "50", "100", "200" };
+
 static const setting_t COMPASS_SCHEMA[] = {
     {.key = "imu_enabled", .type = SET_BOOL, .def = "true", .label = "IMU compass enabled",
      .group = "Compass"},
@@ -52,6 +60,25 @@ static const setting_t COMPASS_SCHEMA[] = {
      .group = "Compass", .minv = 0, .maxv = 48, .has_min = true, .has_max = true},
     {.key = "imu_addr_hi", .type = SET_BOOL, .def = "false",
      .label = "I2C address 0x69 (AD0 high)", .group = "Compass"},
+    /* Where the field comes from. The ICM's own AK09916 is the default because it
+     * needs no extra hardware, but it has no oversampling control and on this badge
+     * it reads with 200 to 400 uT of spread, so a separate part is selectable. The
+     * accelerometer always comes from the ICM whatever this says: tilt compensation
+     * needs it, and it has never been the problem. */
+    {.key = "mag_source", .type = SET_ENUM, .def = "imu", .label = "Magnetometer",
+     .group = "Compass", .choices = MAG_SOURCE_CHOICES, .nchoices = 2,
+     .help = "imu = AK09916 inside the ICM-20948; qmc5883l = separate module at 0x0D"},
+    /* 8 G rather than the usual 2 G: 2 G is 200 uT full scale and the interference
+     * measured on this badge is 200 to 400 uT, so it would clip on the noise alone
+     * and look like a broken sensor. */
+    {.key = "qmc_range", .type = SET_ENUM, .def = "8g", .label = "QMC5883L range",
+     .group = "Compass", .choices = QMC_RANGE_CHOICES, .nchoices = 2},
+    /* Oversampling and output rate are exposed because the spread on this badge
+     * varies with sample rate, so both are worth turning while diagnosing it. */
+    {.key = "qmc_osr", .type = SET_ENUM, .def = "512", .label = "QMC5883L oversampling",
+     .group = "Compass", .choices = QMC_OSR_CHOICES, .nchoices = 4},
+    {.key = "qmc_odr", .type = SET_ENUM, .def = "100", .label = "QMC5883L rate (Hz)",
+     .group = "Compass", .choices = QMC_ODR_CHOICES, .nchoices = 4},
 };
 
 static settings_t *s_reg;
@@ -82,6 +109,10 @@ static int64_t s_bad_log_us;
 static volatile bool s_field_bad;
 static int64_t s_last_sample_us, s_last_tilt_us;
 
+/* Which part supplies the field. Fixed at start, because it decides what was
+ * brought up at boot; changing the setting needs a restart the way the pins do. */
+static mag_source_t s_mag_source;
+
 /* Live settings, re-read periodically instead of per sample. */
 static double s_decl_deg;
 static bool s_use_cal;
@@ -107,6 +138,21 @@ static double s_offset[3], s_scale[3];
 static compass_cal_t s_cal;
 static volatile bool s_cal_active;
 static int64_t s_cal_start_us;   /* sweep start, for the CAL_MAX_MS budget */
+
+/* Enum settings are stored as the choice string (core/settings.h has no index
+ * getter), and for all four below the index into the choices array IS the register
+ * field value, so one lookup serves them all. The fallback is the schema default's
+ * index: an unrecognised stored value means someone edited it by hand, and starting
+ * the part in a documented configuration beats refusing to start. */
+static int setting_enum_idx(settings_t *reg, const char *key,
+                            const char *const *choices, int n, int fallback)
+{
+    char buf[16];
+    settings_get_str(reg, key, buf, sizeof buf);
+    for (int i = 0; i < n; i++)
+        if (strcmp(choices[i], buf) == 0) return i;
+    return fallback;
+}
 
 /* --- persistence (NVS "compass"/"magcal") -------------------------------- */
 
@@ -214,6 +260,13 @@ static void compass_task(void *arg)
             compass_attitude_deg(s.ax, s.ay, s.az, &s_reading.roll_deg, &s_reading.pitch_deg);
             s_last_tilt_us = esp_timer_get_time();
 
+            /* The accelerometer above is the ICM's whatever happens here; only the
+             * field is switchable. A separate part is read on its own, and the
+             * sample's mag_ok is replaced by whether that read succeeded, so
+             * everything downstream stays identical for both sources. */
+            if (s_mag_source == MAG_SOURCE_QMC5883L)
+                s.mag_ok = qmc5883l_read(&s.mx, &s.my, &s.mz);
+
             double mx = s.mx, my = s.my, mz = s.mz;
             /* The sweep accumulates the raw field: the correction is derived
              * from uncorrected extremes. Only a sample the fusion would trust is
@@ -319,6 +372,9 @@ void compass_svc_init(settings_t *reg)
     int scl = (int)settings_get_int(reg, "imu_scl_pin");
     int addr = settings_get_bool(reg, "imu_addr_hi") ? IMU_I2C_ADDR_HI : IMU_I2C_ADDR;
 
+    /* The ICM comes up either way. It carries the accelerometer, so without it
+     * there is no tilt compensation and no heading regardless of which part
+     * measures the field. */
     esp_err_t e = imu_init(sda, scl, addr);
     if (e != ESP_OK) {
         /* No IMU fitted is a normal badge, so this stays a warning and the task
@@ -329,11 +385,37 @@ void compass_svc_init(settings_t *reg)
         return;
     }
 
+    int src = setting_enum_idx(reg, "mag_source", MAG_SOURCE_CHOICES, 2, MAG_SOURCE_IMU);
+    if (src == MAG_SOURCE_QMC5883L) {
+        qmc_range_t range = (qmc_range_t)setting_enum_idx(reg, "qmc_range",
+                                                         QMC_RANGE_CHOICES, 2, QMC_RANGE_8G);
+        qmc_osr_t osr = (qmc_osr_t)setting_enum_idx(reg, "qmc_osr",
+                                                    QMC_OSR_CHOICES, 4, QMC_OSR_512);
+        qmc_odr_t odr = (qmc_odr_t)setting_enum_idx(reg, "qmc_odr",
+                                                   QMC_ODR_CHOICES, 4, QMC_ODR_100HZ);
+        /* Same pins as the ICM: the module parallels onto the SAO bus, and
+         * drivers/i2c_bus.h is what lets both of them have it. */
+        if (qmc5883l_init(sda, scl, range, osr, odr) == ESP_OK) {
+            s_mag_source = MAG_SOURCE_QMC5883L;
+        } else {
+            /* Deliberately no fall back to the AK09916. The setting was changed to
+             * get away from that part, so quietly going back to it would present
+             * the fault the user is trying to escape as the new module's. */
+            ESP_LOGW(TAG, "mag_source is qmc5883l but none answered: no heading "
+                          "(set mag_source back to imu to use the AK09916)");
+        }
+    } else {
+        s_mag_source = MAG_SOURCE_IMU;
+    }
+
     compass_lpf_init(&s_lpf);
     s_running = true;
     xTaskCreatePinnedToCore(compass_task, "compass", 3072, NULL, 3, NULL, 1);
-    ESP_LOGI(TAG, "IMU compass on I2C%d sda=%d scl=%d addr=0x%02X, decl %.1f deg",
-             SAO_I2C_PORT, sda, scl, addr, s_decl_deg);
+    ESP_LOGI(TAG, "compass on I2C%d sda=%d scl=%d: accel from ICM 0x%02X, field from %s, "
+                  "decl %.1f deg",
+             SAO_I2C_PORT, sda, scl, addr,
+             s_mag_source == MAG_SOURCE_QMC5883L ? "QMC5883L 0x0D" : "AK09916",
+             s_decl_deg);
 }
 
 bool compass_get(compass_reading_t *out) { *out = s_reading; return s_reading.valid; }
@@ -379,6 +461,7 @@ void compass_get_status(compass_status_t *out)
      * so the state says UNCAL and the UI asks for a sweep, rather than accusing
      * the sensor. */
     out->cal_bad = s_cal_bad;
+    out->mag_source = s_mag_source;
     out->selftest_done = s_selftest_done;
     out->selftest = s_selftest;
     out->state = compass_state_from(s_running, out->ms_since_sample,
@@ -389,6 +472,10 @@ void compass_get_status(compass_status_t *out)
 
 void compass_selftest_begin(void)
 {
+    /* Only the AK09916 has a self-test coil, so a request while another part
+     * supplies the field is dropped rather than quietly testing a magnetometer
+     * that is not the one being used. */
+    if (s_mag_source != MAG_SOURCE_IMU) return;
     s_selftest_done = false;
     s_selftest_req = true;
 }

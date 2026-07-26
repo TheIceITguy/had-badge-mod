@@ -23,6 +23,9 @@ typedef struct {
 /* Health/activity snapshot for the Compass and Diagnostics pages. The four
  * "why is there no heading" causes need four different user actions, so each one
  * is carried as its own fact rather than left to be guessed from the others. */
+/* Which part measures the field. The accelerometer is always the ICM's. */
+typedef enum { MAG_SOURCE_IMU, MAG_SOURCE_QMC5883L } mag_source_t;
+
 typedef struct {
     bool enabled;              /* imu_enabled is on in Settings */
     bool running;              /* sampling task is active (enabled and IMU found) */
@@ -43,6 +46,10 @@ typedef struct {
     /* Last magnetometer self-test, valid only while selftest_done is set. The
      * result is kept rather than recomputed because the test takes 100 ms and
      * changes the measurement mode, so a page cannot run it on every tick. */
+    /* Named rather than implied, because the self-test and the transport counters
+     * below only mean anything for the AK09916: a QMC5883L has no self-test coil,
+     * and the ICM's I2C counters keep climbing for the accelerometer either way. */
+    mag_source_t mag_source;
     bool selftest_done;
     imu_mag_selftest_t selftest;              /* raw field is sane, the stored correction is not */
     uint32_t ms_since_sample;  /* since the last fused heading; UINT32_MAX if never */

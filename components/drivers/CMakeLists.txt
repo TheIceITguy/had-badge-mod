@@ -1,7 +1,7 @@
 idf_component_register(
     SRCS "display_nv3007.c" "backlight.c" "kbd_tca8418.c" "radio_sx1262.c"
          "gps_uart.c" "battery_adc.c" "power_mgmt.c" "wifi.c" "imu_icm20948.c"
-         "vibe.c" "led.c"
+         "vibe.c" "led.c" "i2c_bus.c" "qmc5883l.c"
     INCLUDE_DIRS "include"
     REQUIRES "bsp" "util" "core" "lvgl" "esp_lcd" "esp_driver_spi" "esp_driver_gpio"
              "esp_driver_i2c" "esp_driver_uart" "esp_driver_ledc"
