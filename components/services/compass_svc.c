@@ -69,7 +69,8 @@ static uint32_t s_samples, s_errors;
  * data-ready, and returns noise. Counting the physically impossible samples is
  * what turns that from "the compass is jittery" into a named fault. */
 static uint32_t s_implausible;
-static double s_field_ut;
+static double s_field_ut, s_field_raw_ut;
+static volatile bool s_cal_bad;
 static int64_t s_bad_log_us;
 static volatile bool s_field_bad;
 static int64_t s_last_sample_us, s_last_tilt_us;
@@ -207,32 +208,35 @@ static void compass_task(void *arg)
             bool corrected = s_calibrated && s_use_cal;
             if (corrected) compass_cal_apply(s_offset, s_scale, &mx, &my, &mz);
 
-            /* Reject what cannot be a field before it becomes a heading. atan2
-             * is happy to turn noise into a confident bearing, and a user cannot
-             * tell that from a real one, so this is the difference between a
-             * broken sensor being diagnosable and being mystifying. */
+            /* Two different questions, so two different checks. The RAW field
+             * judges the sensor: it may carry hard iron, but it cannot be a
+             * hundred times the earth's field. The CORRECTED field judges the
+             * stored calibration, because a wrong correction makes a healthy
+             * sensor look broken, and that would send the user out to buy a part
+             * when a fresh sweep is what they need. */
             if (s.mag_ok) {
+                s_field_raw_ut = sqrt(s.mx * s.mx + s.my * s.my + s.mz * s.mz);
                 s_field_ut = sqrt(mx * mx + my * my + mz * mz);
-                s_field_bad = !compass_field_plausible(mx, my, mz);
-                if (s_field_bad) {
-                    /* Say it in the log, rate limited: a sensor that answers but
-                     * does not measure is otherwise invisible except as a restless
-                     * heading, which reads as a firmware bug. One line names the
-                     * component and gives the number that proves it. */
-                    if (s_implausible == 0 ||
-                        esp_timer_get_time() - s_bad_log_us > 10 * 1000 * 1000) {
-                        s_bad_log_us = esp_timer_get_time();
-                        ESP_LOGW(TAG, "magnetometer reads %.0f uT: not a field "
-                                      "(earth is 25-65 uT), heading suppressed; "
-                                      "%lu rejected so far",
-                                 s_field_ut, (unsigned long)s_implausible + 1);
-                    }
+                s_field_bad = !compass_raw_plausible(s.mx, s.my, s.mz);
+                s_cal_bad = !s_field_bad && corrected && !compass_field_plausible(mx, my, mz);
+                if (s_field_bad || s_cal_bad) {
                     s_implausible++;
+                    if (esp_timer_get_time() - s_bad_log_us > 10 * 1000 * 1000) {
+                        s_bad_log_us = esp_timer_get_time();
+                        if (s_field_bad)
+                            ESP_LOGW(TAG, "magnetometer reads %.0f uT raw: not a field "
+                                          "(earth is 25-65 uT), heading suppressed",
+                                     s_field_raw_ut);
+                        else
+                            ESP_LOGW(TAG, "raw field %.0f uT is sane but the saved "
+                                          "calibration turns it into %.0f uT: sweep again",
+                                     s_field_raw_ut, s_field_ut);
+                    }
                 }
             }
 
             double mag;
-            if (s.mag_ok && !s_field_bad &&
+            if (s.mag_ok && !s_field_bad && !s_cal_bad &&
                 compass_heading_deg(s.ax, s.ay, s.az, mx, my, mz, &mag)) {
                 s_reading.magnetic_deg = mag;
                 s_reading.heading_deg =
@@ -352,8 +356,13 @@ void compass_get_status(compass_status_t *out)
      * needs to read. */
     out->implausible = s_implausible;
     out->field_ut = s_field_ut;
+    out->field_raw_ut = s_field_raw_ut;
+    /* A correction that produces an impossible field is not a usable calibration,
+     * so the state says UNCAL and the UI asks for a sweep, rather than accusing
+     * the sensor. */
+    out->cal_bad = s_cal_bad;
     out->state = compass_state_from(s_running, out->ms_since_sample,
-                                    out->reading.calibrated, s_field_bad);
+                                    out->reading.calibrated && !s_cal_bad, s_field_bad);
 }
 
 /* --- calibration ---------------------------------------------------------- */

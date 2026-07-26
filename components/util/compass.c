@@ -83,6 +83,12 @@ bool compass_field_plausible(double mx, double my, double mz)
     return m >= COMPASS_FIELD_MIN_UT && m <= COMPASS_FIELD_MAX_UT;
 }
 
+bool compass_raw_plausible(double mx, double my, double mz)
+{
+    double m = sqrt(mx * mx + my * my + mz * mz);
+    return m >= COMPASS_FIELD_MIN_UT && m <= COMPASS_RAW_MAX_UT;
+}
+
 void compass_cal_init(compass_cal_t *c)
 {
     for (int i = 0; i < 3; i++) {

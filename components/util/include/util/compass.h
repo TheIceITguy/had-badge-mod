@@ -56,8 +56,14 @@ double compass_true_deg(double magnetic_deg, double declination_deg);
  * AK09916 saturates at 4912 uT, and a broken die reads noise across that range. */
 #define COMPASS_RAW_MAX_UT    400.0
 
-/* True when the vector could plausibly be the earth's field. */
+/* True when a CORRECTED vector could plausibly be the earth's field. */
 bool compass_field_plausible(double mx, double my, double mz);
+
+/* True when a RAW vector could plausibly be the earth's field plus hard iron.
+ * Judging the sensor and judging the calibration are different questions: a
+ * stored correction that is wrong makes a healthy sensor look broken, and
+ * blaming the part for that sends the user shopping instead of re-sweeping. */
+bool compass_raw_plausible(double mx, double my, double mz);
 
 typedef struct {
     double min[3], max[3];   /* per-axis extremes seen, uT */

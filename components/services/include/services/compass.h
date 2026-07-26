@@ -37,6 +37,8 @@ typedef struct {
     uint32_t errors;           /* failed reads since boot */
     uint32_t implausible;      /* samples rejected as not-a-magnetic-field */
     double field_ut;           /* magnitude of the last corrected sample, uT */
+    double field_raw_ut;       /* magnitude before the correction, uT */
+    bool cal_bad;              /* raw field is sane, the stored correction is not */
     uint32_t ms_since_sample;  /* since the last fused heading; UINT32_MAX if never */
     uint32_t ms_since_tilt;    /* since the last accelerometer-only attitude */
     uint8_t imu_whoami;        /* raw WHO_AM_I, so a dead part is distinguishable */
