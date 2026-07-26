@@ -203,6 +203,15 @@ static void tick(void)
         }
         lv_label_set_text(s_val[R_CMP_HDG], "--");   /* nothing is published yet */
         break;
+    case COMPASS_STATE_BAD_FIELD:
+        /* The samples arrive and are not a magnetic field. Print the magnitude,
+         * because that number is the whole diagnosis: the earth's field is 25 to
+         * 65 uT anywhere, so hundreds or thousands means the die is dead or
+         * counterfeit, and no amount of calibrating will change it. */
+        snprintf(b, sizeof b, "bad field %.0f uT", cst.field_ut);
+        lv_label_set_text(s_val[R_CMP], b);
+        lv_label_set_text(s_val[R_CMP_HDG], "--");
+        break;
     case COMPASS_STATE_OK:
         lv_label_set_text(s_val[R_CMP], "ok");
         /* Magnetic and declination next to the true heading: a heading that is
@@ -235,9 +244,10 @@ static void tick(void)
         snprintf(b, sizeof b, "id %02X, no reads", cst.imu_whoami);
         lv_label_set_text(s_val[R_CMP_DATA], b);
     } else if (cst.ms_since_sample == UINT32_MAX) {
-        snprintf(b, sizeof b, "id %02X  %lu rd, %lu e  %lu smp, none yet",
+        snprintf(b, sizeof b, "id %02X  %lu rd, %lu e  %lu smp, %lu bad, none yet",
                  cst.imu_whoami, (unsigned long)cst.imu_reads,
-                 (unsigned long)cst.imu_errors, (unsigned long)cst.samples);
+                 (unsigned long)cst.imu_errors, (unsigned long)cst.samples,
+                 (unsigned long)cst.implausible);
         lv_label_set_text(s_val[R_CMP_DATA], b);
     } else {
         snprintf(b, sizeof b, "id %02X  %lu rd, %lu e  %lu smp, %lus",

@@ -349,17 +349,17 @@ void run_compass(void)
 
     SUITE("compass/state");
     /* Not running -> OFF regardless of the rest. */
-    CHECK_EQI(compass_state_from(false, 0, true), COMPASS_STATE_OFF);
-    CHECK_EQI(compass_state_from(false, UINT32_MAX, false), COMPASS_STATE_OFF);
+    CHECK_EQI(compass_state_from(false, 0, true, false), COMPASS_STATE_OFF);
+    CHECK_EQI(compass_state_from(false, UINT32_MAX, false, false), COMPASS_STATE_OFF);
     /* Running but nothing arriving, or samples gone stale -> NO_DATA. */
-    CHECK_EQI(compass_state_from(true, UINT32_MAX, true), COMPASS_STATE_NO_DATA);
-    CHECK_EQI(compass_state_from(true, COMPASS_NO_DATA_MS + 1, true), COMPASS_STATE_NO_DATA);
+    CHECK_EQI(compass_state_from(true, UINT32_MAX, true, false), COMPASS_STATE_NO_DATA);
+    CHECK_EQI(compass_state_from(true, COMPASS_NO_DATA_MS + 1, true, false), COMPASS_STATE_NO_DATA);
     /* Samples flowing but no calibration -> UNCAL, including at the boundary. */
-    CHECK_EQI(compass_state_from(true, 0, false), COMPASS_STATE_UNCAL);
-    CHECK_EQI(compass_state_from(true, COMPASS_NO_DATA_MS, false), COMPASS_STATE_UNCAL);
+    CHECK_EQI(compass_state_from(true, 0, false, false), COMPASS_STATE_UNCAL);
+    CHECK_EQI(compass_state_from(true, COMPASS_NO_DATA_MS, false, false), COMPASS_STATE_UNCAL);
     /* Fresh and calibrated -> OK. */
-    CHECK_EQI(compass_state_from(true, 0, true), COMPASS_STATE_OK);
-    CHECK_EQI(compass_state_from(true, COMPASS_NO_DATA_MS, true), COMPASS_STATE_OK);
+    CHECK_EQI(compass_state_from(true, 0, true, false), COMPASS_STATE_OK);
+    CHECK_EQI(compass_state_from(true, COMPASS_NO_DATA_MS, true, false), COMPASS_STATE_OK);
 
     SUITE("compass/pick-up");
     double up = -1.0;
@@ -494,4 +494,58 @@ void run_compass(void)
     hh = compass_hint(hs, COMPASS_STATE_OK, true, true);
     CHECK_STR(compass_hint_text(hh), "");
     CHECK_STR(compass_up_label(true, hs, hh), "Heading up");
+
+    SUITE("compass/field-plausible");
+    /* The earth's field is 25 to 65 uT everywhere, so the band either side of
+     * that is what a working sensor must land in. */
+    CHECK(compass_field_plausible(20.0, 0.0, -44.0));      /* ~48 uT, Swiss latitudes */
+    CHECK(compass_field_plausible(0.0, 0.0, 25.0));        /* weakest real field */
+    CHECK(compass_field_plausible(0.0, 0.0, 65.0));        /* strongest real field */
+    CHECK(compass_field_plausible(0.0, 0.0, COMPASS_FIELD_MIN_UT));   /* boundary, inclusive */
+    CHECK(compass_field_plausible(0.0, 0.0, COMPASS_FIELD_MAX_UT));
+    CHECK(!compass_field_plausible(0.0, 0.0, COMPASS_FIELD_MIN_UT - 0.1));
+    CHECK(!compass_field_plausible(0.0, 0.0, COMPASS_FIELD_MAX_UT + 0.1));
+    CHECK(!compass_field_plausible(0.0, 0.0, 0.0));        /* a dropped read */
+    /* The values a dead or counterfeit die actually returned on hardware: a
+     * magnitude of hundreds to thousands of uT, which no place on earth has. */
+    CHECK(!compass_field_plausible(1285.2, 485.2, 2304.2));
+    CHECK(!compass_field_plausible(-393.8, 666.9, 140.5));
+
+    SUITE("compass/cal-rejects-impossible-magnitudes");
+    {
+        /* One sample from a broken die must not widen the box: it would move the
+         * hard-iron centre by hundreds of uT and poison the whole sweep. */
+        compass_cal_t c;
+        compass_cal_init(&c);
+        compass_cal_add(&c, 20.0, 0.0, -44.0);             /* a real field, accepted */
+        CHECK_EQI((int)c.samples, 1);
+        compass_cal_add(&c, 1285.2, 485.2, 2304.2);        /* impossible, ignored */
+        CHECK_EQI((int)c.samples, 1);
+        CHECK_NEAR(c.max[2], -44.0, 0.001);                /* box unmoved */
+        compass_cal_add(&c, 0.0, 0.0, COMPASS_RAW_MAX_UT + 1.0);
+        CHECK_EQI((int)c.samples, 1);
+        /* Raw hard iron up to the raw bound is still legitimate input. */
+        compass_cal_add(&c, 0.0, 0.0, 150.0);
+        CHECK_EQI((int)c.samples, 2);
+    }
+
+    SUITE("compass/state-bad-field");
+    /* A sensor returning noise outranks the calibration question: no sweep fixes
+     * a die that is not measuring, so the state must not read UNCAL. */
+    CHECK_EQI(compass_state_from(true, 0, false, true), COMPASS_STATE_BAD_FIELD);
+    CHECK_EQI(compass_state_from(true, 0, true, true), COMPASS_STATE_BAD_FIELD);
+    /* Liveness still outranks it: nothing arriving is NO_DATA, not bad data. */
+    CHECK_EQI(compass_state_from(true, UINT32_MAX, true, true), COMPASS_STATE_NO_DATA);
+    CHECK_EQI(compass_state_from(false, 0, true, true), COMPASS_STATE_OFF);
+
+    SUITE("compass/hint-bad-field");
+    /* Telling the user to calibrate a broken sensor is the wrong instruction;
+     * GPS course is genuinely all that badge has left. */
+    CHECK_EQI(compass_hint(COMPASS_SRC_NONE, COMPASS_STATE_BAD_FIELD, false, false),
+              COMPASS_HINT_MOVE);
+    CHECK_EQI(compass_hint(COMPASS_SRC_NONE, COMPASS_STATE_BAD_FIELD, true, true),
+              COMPASS_HINT_MOVE);
+    /* A real heading in use still says nothing, whatever the sensor state. */
+    CHECK_EQI(compass_hint(COMPASS_SRC_GPS, COMPASS_STATE_BAD_FIELD, false, false),
+              COMPASS_HINT_NONE);
 }

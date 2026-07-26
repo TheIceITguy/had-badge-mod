@@ -26,6 +26,11 @@
 
 static lv_obj_t *s_state, *s_hdg, *s_src, *s_mag, *s_att, *s_cal, *s_hint;
 
+/* The bad-field hint carries a measured number, so unlike the other hints it
+ * cannot be a literal. LVGL copies label text, but the buffer is static anyway
+ * so nothing depends on that. */
+static char s_hint_buf[256];
+
 /* A sweep is only offered while a magnetometer is actually answering. The F1
  * label and the F1 action both ask this, so they cannot disagree. */
 static bool can_calibrate(const compass_status_t *st)
@@ -50,6 +55,16 @@ static void reset_hint(void)
     compass_get_status(&st);
     if (st.cal_active) {
         lv_label_set_text(s_hint, HINT_SWEEP);
+    } else if (st.state == COMPASS_STATE_BAD_FIELD) {
+        /* Ahead of the calibration branches on purpose. Sweeping is exactly the
+         * wrong instruction here, and it is the one the user will otherwise try
+         * repeatedly, since a spinning heading looks like bad calibration. */
+        snprintf(s_hint_buf, sizeof s_hint_buf,
+                 "The magnetometer is answering but not measuring: %.0f uT, when the earth's field is "
+                 "25 to 65 uT anywhere. Calibration cannot fix this. Either something magnetic is "
+                 "against the sensor, or the die is dead (counterfeit ICM-20948 modules are common).",
+                 st.field_ut);
+        lv_label_set_text(s_hint, s_hint_buf);
     } else if (!can_calibrate(&st)) {
         /* Three ways to have nothing to calibrate and three unrelated fixes, so the
          * cause has to be named: the magnetometer die, the setting, or the header.
@@ -177,6 +192,11 @@ static void tick(void)
             lv_label_set_text(s_state, st.mag_present ? "No data" : "No magnetometer");
             break;
         case COMPASS_STATE_UNCAL:   lv_label_set_text(s_state, "Uncalibrated"); break;
+        /* Samples are arriving and are not a magnetic field. Naming the fault
+         * matters more here than anywhere: the symptom on the old firmware was a
+         * heading that span, which reads as a software bug and sends people to
+         * calibrate again instead of at the sensor. */
+        case COMPASS_STATE_BAD_FIELD: lv_label_set_text(s_state, "Bad field"); break;
         case COMPASS_STATE_OK:      lv_label_set_text(s_state, "Ready"); break;
         }
         lv_obj_set_style_text_color(s_state, theme_hex(C_TEXT), 0);

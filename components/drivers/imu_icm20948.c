@@ -17,10 +17,21 @@ static const char *TAG = "imu";
 #define B0_USER_CTRL       0x03
 #define B0_PWR_MGMT_1      0x06
 #define B0_PWR_MGMT_2      0x07
+#define B0_LP_CONFIG       0x05   /* resets to 0x40: I2C_MST_CYCLE set */
 #define B0_INT_PIN_CFG     0x0F
 #define B0_ACCEL_XOUT_H    0x2D   /* first of 14: accel, gyro, temperature */
 #define B2_GYRO_CONFIG_1   0x01
 #define B2_ACCEL_CONFIG    0x14
+#define B0_EXT_SLV_DATA_00 0x3B   /* where the aux master parks what it read */
+#define B3_I2C_MST_ODR_CFG 0x00
+#define B3_I2C_MST_CTRL    0x01
+#define B3_I2C_SLV0_ADDR   0x03
+#define B3_I2C_SLV0_REG    0x04
+#define B3_I2C_SLV0_CTRL   0x05
+#define USER_CTRL_MST_ON   0x20   /* I2C_MST_EN */
+#define MST_CTRL_345KHZ    0x17   /* 345.6 kHz + P_NSR stop-between-reads */
+#define SLV0_READ_FLAG     0x80   /* OR into the address for a read transfer */
+#define SLV0_EN            0x80   /* OR into CTRL with the byte count */
 
 #define WHOAMI_ICM20948    0xEA   /* section 8.1 */
 #define MPU_WHO_AM_I       0x75   /* where the MPU-6050/9250 family keeps its ID */
@@ -227,19 +238,24 @@ bool imu_read(imu_sample_t *out)
     out->mag_ok = false;
     if (!s_mag_present) return true;
 
-    /* ST1 through ST2 in one burst. ST2 is what tells the AK09916 the sample was
-     * collected, so it has to be the last byte read or the next measurement
-     * never lands (AK09916 section 13.4). */
+    /* One transaction per register, not a burst. On this bypass path a 9-byte
+     * sequential read returns data that disagrees with reading the same registers
+     * singly: it reported data-ready with non-zero values at a moment when ST1
+     * and every data register read zero. Interpreting that as a field is what
+     * produced a confident, wildly wrong heading, so the burst is not used at all.
+     * Eight short transfers at 20 Hz is 160 a second, which this bus does not
+     * notice, and ST2 is still read last so the die releases the next sample. */
     uint8_t m[MAG_BURST];
-    if (reg_read(s_mag, M_ST1, m, sizeof m) != ESP_OK) { s_errors++; return true; }
-    if (!(m[0] & M_ST1_DRDY) || (m[8] & M_ST2_HOFL)) return true;
+    if (reg_read(s_mag, M_ST1, &m[0], 1) != ESP_OK) { s_errors++; return true; }
+    if (!(m[0] & M_ST1_DRDY)) return true;
+    for (int i = 1; i < MAG_BURST; i++) {
+        if (reg_read(s_mag, (uint8_t)(M_ST1 + i), &m[i], 1) != ESP_OK) {
+            s_errors++;
+            return true;
+        }
+    }
+    if (m[8] & M_ST2_HOFL) return true;      /* saturated: not a field */
 
-    /* The magnetometer die is rotated 180 degrees about X relative to the
-     * accel/gyro die: comparing figures 12 and 13 of DS-000189 section 15, mag
-     * +X runs the same way as accel +X while mag +Y and +Z run the opposite way.
-     * InvenSense's own driver uses the same diag(1, -1, -1) for the AK09916.
-     * imu.h promises the accelerometer frame, so fix it here once, where the
-     * datasheet is at hand, instead of in the fusion math. */
     out->mx =  le16(&m[1]) * MAG_UT_PER_LSB;
     out->my = -le16(&m[3]) * MAG_UT_PER_LSB;
     out->mz = -le16(&m[5]) * MAG_UT_PER_LSB;

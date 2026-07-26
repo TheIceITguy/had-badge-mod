@@ -77,6 +77,12 @@ double compass_true_deg(double magnetic_deg, double declination_deg)
     return compass_wrap360(magnetic_deg + declination_deg);
 }
 
+bool compass_field_plausible(double mx, double my, double mz)
+{
+    double m = sqrt(mx * mx + my * my + mz * mz);
+    return m >= COMPASS_FIELD_MIN_UT && m <= COMPASS_FIELD_MAX_UT;
+}
+
 void compass_cal_init(compass_cal_t *c)
 {
     for (int i = 0; i < 3; i++) {
@@ -97,8 +103,13 @@ void compass_cal_add(compass_cal_t *c, double mx, double my, double mz)
      * rest of the sweep and pass the span floor on its own. Refused before the
      * seed, so it neither moves the box nor counts as a sample -- the service
      * filters on its own read flag too, but this layer must not be poisonable by
-     * any caller. Same floor the heading maths uses. */
-    if (sqrt(mx * mx + my * my + mz * mz) < COMPASS_CAL_MIN_UT) return;
+     * any caller. Same floor the heading maths uses.
+     *
+     * The upper bound matters just as much: a dead or counterfeit die answers on
+     * the bus and returns noise across its whole range, and one such sample
+     * widens the box by hundreds of uT for the rest of the sweep. */
+    double mag = sqrt(mx * mx + my * my + mz * mz);
+    if (mag < COMPASS_CAL_MIN_UT || mag > COMPASS_RAW_MAX_UT) return;
 
     if (!c->seeded) {
         /* Seed both extremes from the first sample. Starting from +-HUGE_VAL
@@ -194,11 +205,12 @@ double compass_lpf_update(compass_lpf_t *f, double deg, double alpha)
 }
 
 compass_state_t compass_state_from(bool running, uint32_t ms_since_sample,
-                                   bool calibrated)
+                                   bool calibrated, bool field_bad)
 {
     if (!running) return COMPASS_STATE_OFF;
     if (ms_since_sample == UINT32_MAX || ms_since_sample > COMPASS_NO_DATA_MS)
         return COMPASS_STATE_NO_DATA;
+    if (field_bad) return COMPASS_STATE_BAD_FIELD;
     if (!calibrated) return COMPASS_STATE_UNCAL;
     return COMPASS_STATE_OK;
 }
@@ -240,6 +252,12 @@ compass_hint_t compass_hint(compass_src_t src, compass_state_t state,
          * sweep would not help: the setting is the fix. */
         return (cal_stored && !cal_in_use) ? COMPASS_HINT_CAL_OFF : COMPASS_HINT_CAL;
     }
+    /* A sensor returning something that is not a field cannot be swept into
+     * working, so BAD_FIELD must not map to CAL. It maps to MOVE, because GPS
+     * course really is the only heading left on that badge, the same as having no
+     * magnetometer at all. The Compass and Diagnostics pages name the real fault;
+     * a one-word hint on a map view cannot. */
+    if (state == COMPASS_STATE_BAD_FIELD) return COMPASS_HINT_MOVE;
     /* Fitted and calibrated, so the samples are only late: NO_DATA, and the
      * heading-up view that has not seen its first fused sample yet. */
     return COMPASS_HINT_WAIT;

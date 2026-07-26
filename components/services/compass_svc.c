@@ -7,6 +7,7 @@
 #include "util/compass.h"
 #include "board_pins.h"
 
+#include <math.h>
 #include <string.h>
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -63,6 +64,14 @@ static compass_lpf_t s_lpf;
  * 0 = never. The attitude has its own: it comes from gravity alone and keeps
  * updating when only the magnetometer die is broken. */
 static uint32_t s_samples, s_errors;
+
+/* A magnetometer whose die is dead or counterfeit answers on the bus, reports
+ * data-ready, and returns noise. Counting the physically impossible samples is
+ * what turns that from "the compass is jittery" into a named fault. */
+static uint32_t s_implausible;
+static double s_field_ut;
+static int64_t s_bad_log_us;
+static volatile bool s_field_bad;
 static int64_t s_last_sample_us, s_last_tilt_us;
 
 /* Live settings, re-read periodically instead of per sample. */
@@ -198,8 +207,33 @@ static void compass_task(void *arg)
             bool corrected = s_calibrated && s_use_cal;
             if (corrected) compass_cal_apply(s_offset, s_scale, &mx, &my, &mz);
 
+            /* Reject what cannot be a field before it becomes a heading. atan2
+             * is happy to turn noise into a confident bearing, and a user cannot
+             * tell that from a real one, so this is the difference between a
+             * broken sensor being diagnosable and being mystifying. */
+            if (s.mag_ok) {
+                s_field_ut = sqrt(mx * mx + my * my + mz * mz);
+                s_field_bad = !compass_field_plausible(mx, my, mz);
+                if (s_field_bad) {
+                    /* Say it in the log, rate limited: a sensor that answers but
+                     * does not measure is otherwise invisible except as a restless
+                     * heading, which reads as a firmware bug. One line names the
+                     * component and gives the number that proves it. */
+                    if (s_implausible == 0 ||
+                        esp_timer_get_time() - s_bad_log_us > 10 * 1000 * 1000) {
+                        s_bad_log_us = esp_timer_get_time();
+                        ESP_LOGW(TAG, "magnetometer reads %.0f uT: not a field "
+                                      "(earth is 25-65 uT), heading suppressed; "
+                                      "%lu rejected so far",
+                                 s_field_ut, (unsigned long)s_implausible + 1);
+                    }
+                    s_implausible++;
+                }
+            }
+
             double mag;
-            if (s.mag_ok && compass_heading_deg(s.ax, s.ay, s.az, mx, my, mz, &mag)) {
+            if (s.mag_ok && !s_field_bad &&
+                compass_heading_deg(s.ax, s.ay, s.az, mx, my, mz, &mag)) {
                 s_reading.magnetic_deg = mag;
                 s_reading.heading_deg =
                     compass_lpf_update(&s_lpf, compass_true_deg(mag, s_decl_deg), LPF_ALPHA);
@@ -211,6 +245,7 @@ static void compass_task(void *arg)
                 s_samples++;
                 s_last_sample_us = esp_timer_get_time();
             }
+
         }
 
         /* Retire a stale snapshot here, not in compass_get(): the UI polls that
@@ -251,7 +286,11 @@ void compass_svc_init(settings_t *reg)
     double offset[3], scale[3];
     if (cal_store_load(offset, scale)) {
         cal_use(offset, scale);
-        ESP_LOGI(TAG, "mag cal loaded: off %.1f %.1f %.1f uT", offset[0], offset[1], offset[2]);
+        /* Scales matter as much as offsets: a marginal sweep gives one axis a
+         * small span, and scale = mean/span then amplifies that axis and its
+         * noise, which shows up as a restless heading rather than a wrong one. */
+        ESP_LOGI(TAG, "mag cal loaded: off %.1f %.1f %.1f uT, scale %.3f %.3f %.3f",
+                 offset[0], offset[1], offset[2], scale[0], scale[1], scale[2]);
     }
 
     int sda = (int)settings_get_int(reg, "imu_sda_pin");
@@ -311,8 +350,10 @@ void compass_get_status(compass_status_t *out)
      * failed. Folding it into OFF would blame the whole part for a fault in half
      * of it, which is the opposite of what someone debugging a fresh solder joint
      * needs to read. */
+    out->implausible = s_implausible;
+    out->field_ut = s_field_ut;
     out->state = compass_state_from(s_running, out->ms_since_sample,
-                                    out->reading.calibrated);
+                                    out->reading.calibrated, s_field_bad);
 }
 
 /* --- calibration ---------------------------------------------------------- */

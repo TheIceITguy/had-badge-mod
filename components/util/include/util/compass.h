@@ -39,6 +39,26 @@ double compass_true_deg(double magnetic_deg, double declination_deg);
 #define COMPASS_CAL_MIN_SPAN_UT 20.0    /* per-axis span that proves rotation */
 #define COMPASS_CAL_MIN_UT      0.1     /* a shorter vector is not a measurement */
 
+/* --- Is this vector even a magnetic field? --------------------------------
+ * The earth's total field is between about 25 and 65 uT everywhere on the
+ * planet, so a reading far outside that is not a field at all. It is a dead or
+ * counterfeit magnetometer die returning noise, saturation, or a magnet sitting
+ * against the sensor. Checking this matters because atan2 turns any pair of
+ * numbers into a confident-looking heading, so without it the badge renders
+ * nonsense as a bearing and the user has no way to tell. */
+
+/* Bounds for a CORRECTED sample, generous enough for an imperfect calibration. */
+#define COMPASS_FIELD_MIN_UT  10.0
+#define COMPASS_FIELD_MAX_UT  120.0
+
+/* Bound for a RAW sample, which still carries hard iron. A badge next to a
+ * speaker magnet might read a couple of hundred uT and calibrate out of it; the
+ * AK09916 saturates at 4912 uT, and a broken die reads noise across that range. */
+#define COMPASS_RAW_MAX_UT    400.0
+
+/* True when the vector could plausibly be the earth's field. */
+bool compass_field_plausible(double mx, double my, double mz);
+
 typedef struct {
     double min[3], max[3];   /* per-axis extremes seen, uT */
     uint32_t samples;
@@ -87,14 +107,18 @@ typedef enum {
     COMPASS_STATE_OFF,       /* disabled in Settings, or no sensor found */
     COMPASS_STATE_NO_DATA,   /* sampling, but nothing is arriving */
     COMPASS_STATE_UNCAL,     /* samples flowing, magnetometer not calibrated */
+    COMPASS_STATE_BAD_FIELD, /* samples arriving, but they are not a magnetic field */
     COMPASS_STATE_OK,        /* fresh, calibrated heading */
 } compass_state_t;
 
 #define COMPASS_NO_DATA_MS 2000u   /* no sample for this long -> NO_DATA */
 
-/* Derive the coarse state. ms_since_sample uses UINT32_MAX for "never". */
+/* Derive the coarse state. ms_since_sample uses UINT32_MAX for "never".
+ * field_bad reports that samples are arriving but fail compass_field_plausible,
+ * which outranks the calibration question: no sweep can fix a sensor that is not
+ * measuring, so telling the user to calibrate would send them the wrong way. */
 compass_state_t compass_state_from(bool running, uint32_t ms_since_sample,
-                                   bool calibrated);
+                                   bool calibrated, bool field_bad);
 
 /* --- Heading source arbitration ------------------------------------------- */
 
