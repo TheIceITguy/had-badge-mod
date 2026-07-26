@@ -17,6 +17,7 @@
 #include "ble/ble.h"
 #include "services/compass.h"
 #include "drivers/qmc5883l.h"
+#include "drivers/bno055.h"
 #include "services/services.h"
 #include "util/gps_state.h"
 #include "util/compass.h"
@@ -263,7 +264,27 @@ static void tick(void)
     /* Which part is measuring the field, and its own counters. Without this row the
      * Data row above reads as though it described the magnetometer, when on a badge
      * using a separate part it describes the accelerometer's transport only. */
-    if (cst.mag_source == MAG_SOURCE_QMC5883L) {
+    if (cst.mag_source == MAG_SOURCE_BNO055) {
+        bno055_status_t bn;
+        bno055_get_status(&bn);
+        if (!bn.present) {
+            lv_label_set_text(s_val[R_CMP_SRC], "BNO055: none found");
+        } else {
+            /* The four calibration figures are the point of this row. A BNO055
+             * reports a confident heading from power-up, and mag below 2 is why a
+             * part that is plainly working still publishes nothing. sys_err is the
+             * part reporting a fault about itself, so it is shown when non-zero
+             * rather than left for the log. */
+            snprintf(b, sizeof b, "BNO055 %s  cal s%u g%u a%u m%u%s",
+                     bn.ext_crystal ? "xtal" : "int-osc",
+                     bn.calib.sys, bn.calib.gyro, bn.calib.accel, bn.calib.mag,
+                     bn.sys_err ? "  ERR" : "");
+            lv_label_set_text(s_val[R_CMP_SRC], b);
+            lv_obj_set_style_text_color(s_val[R_CMP_SRC],
+                                        theme_hex(bn.calib.mag >= 2 && !bn.sys_err
+                                                  ? C_OK : C_WARN), 0);
+        }
+    } else if (cst.mag_source == MAG_SOURCE_QMC5883L) {
         qmc5883l_status_t q;
         qmc5883l_get_status(&q);
         if (!q.present) {
@@ -290,6 +311,8 @@ static void tick(void)
      * been pressed, because a verdict left over from a different module would be
      * worse than none, and not offered at all for a part with no self-test coil. */
     if (cst.mag_source != MAG_SOURCE_IMU) {
+        /* A QMC5883L has no self-test coil, and a BNO055 calibrates itself
+         * continuously and reports that in the row above instead. */
         lv_label_set_text(s_val[R_CMP_ST], "n/a for this part");
     } else if (!cst.mag_present) {
         lv_label_set_text(s_val[R_CMP_ST], "--");

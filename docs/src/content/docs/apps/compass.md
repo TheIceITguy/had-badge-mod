@@ -71,6 +71,14 @@ with no compass heading, the Source row falls back to GPS course over ground.
 F1 is unlabelled and does nothing when there is no magnetometer answering, because there would be
 nothing to calibrate.
 
+## With a BNO055 there is no sweep
+
+If `mag_source` is `bno055` this page has no F1 action, and that is correct rather than broken. The
+part fuses its own heading and calibrates itself as the badge moves, so the badge never applies a
+correction to it and a sweep it controls would promise something it cannot deliver. The Calibration row
+reads `self, mag n/3` and a heading appears once that reaches 2. Turn the badge through a figure of
+eight to get there, and read the four figures in Diagnostics to watch it happen.
+
 ## Judging the sensor itself
 
 Calibration cannot fix a magnetometer that is not measuring, and the two faults look identical from

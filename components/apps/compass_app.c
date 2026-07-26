@@ -31,11 +31,14 @@ static lv_obj_t *s_state, *s_hdg, *s_src, *s_mag, *s_att, *s_cal, *s_hint;
  * so nothing depends on that. */
 static char s_hint_buf[256];
 
-/* A sweep is only offered while a magnetometer is actually answering. The F1
- * label and the F1 action both ask this, so they cannot disagree. */
+/* A sweep is only offered while a magnetometer the badge itself corrects is
+ * answering. The F1 label and the F1 action both ask this, so they cannot
+ * disagree. A BNO055 calibrates itself continuously and the badge never applies a
+ * correction to it, so offering a sweep there would promise something the button
+ * cannot do. */
 static bool can_calibrate(const compass_status_t *st)
 {
-    return st->running && st->mag_present;
+    return st->running && st->mag_present && st->mag_source != MAG_SOURCE_BNO055;
 }
 
 /* Every label is derived, never remembered: the sweep lives in the service, so
@@ -65,6 +68,17 @@ static void reset_hint(void)
                  "against the sensor, or the die is dead (counterfeit ICM-20948 modules are common).",
                  st.field_ut);
         lv_label_set_text(s_hint, s_hint_buf);
+    } else if (st.mag_source == MAG_SOURCE_BNO055) {
+        /* Ahead of the can_calibrate branches, which would otherwise report this as
+         * a missing magnetometer. Nothing is wrong here and there is nothing to
+         * press: the part is calibrated by moving the badge, not by a sweep the
+         * badge controls, and Diagnostics carries the four figures that say how far
+         * along that is. */
+        lv_label_set_text(s_hint, "A BNO055 fuses its own heading and calibrates itself as the badge "
+                                  "moves, so there is no sweep to run. Turn the badge through a "
+                                  "figure of eight to bring its magnetometer up; Diagnostics shows "
+                                  "the calibration figures, and a heading appears once the "
+                                  "magnetometer reaches 2 of 3.");
     } else if (!can_calibrate(&st)) {
         /* Three ways to have nothing to calibrate and three unrelated fixes, so the
          * cause has to be named: the magnetometer die, the setting, or the header.
@@ -242,6 +256,10 @@ static void tick(void)
      * calibration that mag_cal_use is keeping out of the loop has to say so: it is
      * neither absent nor working, and offering a sweep instead would not help. */
     if (state == COMPASS_STATE_OFF) lv_label_set_text(s_cal, "--");
+    else if (st.mag_source == MAG_SOURCE_BNO055) {
+        snprintf(b, sizeof b, "self, mag %u/3", st.bno_calib.mag);
+        lv_label_set_text(s_cal, b);
+    }
     else if (st.cal_active) lv_label_set_text(s_cal, st.cal_ready ? "Ready to save" : "Sweeping, keep turning");
     else if (!st.cal_stored) lv_label_set_text(s_cal, "None, press F1");
     else lv_label_set_text(s_cal, st.cal_in_use ? "Saved, in use" : "Saved, mag_cal_use off");

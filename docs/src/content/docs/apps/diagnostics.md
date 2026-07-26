@@ -84,6 +84,12 @@ with `mag_source` in Settings. The accelerometer is always the ICM's, because ti
 it. This row says which part is in use, so the Data row above is not misread: on a badge using a
 separate magnetometer, those I2C counters describe the accelerometer's transport and nothing else.
 
+With a BNO055 it carries whether the external crystal was selected and the four calibration figures,
+`s` for the fused system and `g`, `a`, `m` for the gyroscope, accelerometer and magnetometer, each 0 to
+3. Those figures are the point of the row: a BNO055 reports a confident heading from power-up, and
+`m` below 2 is why a part that is plainly working still publishes nothing. Turn the badge through a
+figure of eight to bring it up. `ERR` means the part is reporting a fault about itself.
+
 With a QMC5883L it carries that part's own counters, `rd`, `e` and `ovl`. The last one is the
 interesting one. It counts samples where the field exceeded the selected range, so the counts were
 clipped rather than merely noisy, and it means `qmc_range` needs to be larger. See

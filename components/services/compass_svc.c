@@ -5,6 +5,7 @@
 #include "services/services.h"
 #include "drivers/imu.h"
 #include "drivers/qmc5883l.h"
+#include "drivers/bno055.h"
 #include "util/compass.h"
 #include "board_pins.h"
 
@@ -39,7 +40,7 @@ static const char *TAG = "compass";
 
 /* Enum choices live above the schema because the schema points at them. Order is
  * load-bearing: the index into each array is the register field value. */
-static const char *const MAG_SOURCE_CHOICES[] = { "imu", "qmc5883l" };
+static const char *const MAG_SOURCE_CHOICES[] = { "imu", "qmc5883l", "bno055" };
 static const char *const QMC_RANGE_CHOICES[]  = { "2g", "8g" };
 static const char *const QMC_OSR_CHOICES[]    = { "512", "256", "128", "64" };
 static const char *const QMC_ODR_CHOICES[]    = { "10", "50", "100", "200" };
@@ -66,8 +67,9 @@ static const setting_t COMPASS_SCHEMA[] = {
      * accelerometer always comes from the ICM whatever this says: tilt compensation
      * needs it, and it has never been the problem. */
     {.key = "mag_source", .type = SET_ENUM, .def = "imu", .label = "Magnetometer",
-     .group = "Compass", .choices = MAG_SOURCE_CHOICES, .nchoices = 2,
-     .help = "imu = AK09916 inside the ICM-20948; qmc5883l = separate module at 0x0D"},
+     .group = "Compass", .choices = MAG_SOURCE_CHOICES, .nchoices = 3,
+     .help = "imu = AK09916 in the ICM-20948; qmc5883l = module at 0x0D; "
+             "bno055 = module at 0x28 that fuses its own heading"},
     /* 8 G rather than the usual 2 G: 2 G is 200 uT full scale and the interference
      * measured on this badge is 200 to 400 uT, so it would clip on the noise alone
      * and look like a broken sensor. */
@@ -79,6 +81,8 @@ static const setting_t COMPASS_SCHEMA[] = {
      .group = "Compass", .choices = QMC_OSR_CHOICES, .nchoices = 4},
     {.key = "qmc_odr", .type = SET_ENUM, .def = "100", .label = "QMC5883L rate (Hz)",
      .group = "Compass", .choices = QMC_ODR_CHOICES, .nchoices = 4},
+    {.key = "bno_addr_hi", .type = SET_BOOL, .def = "false",
+     .label = "BNO055 address 0x29", .group = "Compass"},
 };
 
 static settings_t *s_reg;
@@ -98,6 +102,10 @@ static uint32_t s_samples, s_errors;
 static uint32_t s_implausible;
 static double s_field_ut, s_field_raw_ut;
 
+/* Last calibration status reported by a BNO055, when that is the source. Kept so
+ * Diagnostics can show it without a second I2C read from the UI task. */
+static bno055_calib_t s_bno_calib;
+
 /* Magnetometer self-test, run on request by the task that owns imu_read(). The
  * die measures a coil on its own substrate, so this is the only check that
  * separates a broken sensor from a magnetic desk, a bad SAO joint or a stale
@@ -112,6 +120,10 @@ static int64_t s_last_sample_us, s_last_tilt_us;
 /* Which part supplies the field. Fixed at start, because it decides what was
  * brought up at boot; changing the setting needs a restart the way the pins do. */
 static mag_source_t s_mag_source;
+
+/* Whether the ICM answered. Only the BNO055 can do without it, so this is what
+ * separates "no accelerometer, therefore no tilt" from a genuinely absent part. */
+static bool s_imu_present;
 
 /* Live settings, re-read periodically instead of per sample. */
 static double s_decl_deg;
@@ -249,6 +261,49 @@ static void compass_task(void *arg)
             s_selftest_done = true;
         }
 
+        /* A fused source is a different pipeline, not a different sensor. It reports
+         * heading, roll and pitch already corrected, so the tilt maths, the
+         * hard-iron correction and the calibration sweep are all bypassed rather
+         * than fed. Only the low-pass is kept, because ui/map_canvas.c re-streams
+         * the basemap whenever the up direction moves and an unsmoothed heading
+         * would repaint continuously whatever produced it. */
+        if (s_mag_source == MAG_SOURCE_BNO055) {
+            bno055_sample_t b;
+            if (!bno055_read(&b)) {
+                s_errors++;
+            } else {
+                s_reading.roll_deg = b.roll_deg;
+                s_reading.pitch_deg = b.pitch_deg;
+                s_last_tilt_us = esp_timer_get_time();
+
+                s_field_raw_ut = sqrt(b.mx * b.mx + b.my * b.my + b.mz * b.mz);
+                s_field_ut = s_field_raw_ut;      /* nothing of ours corrects it */
+                s_field_bad = !compass_raw_plausible(b.mx, b.my, b.mz);
+                s_cal_bad = false;
+
+                /* The part reports a confident heading from the moment it powers up,
+                 * long before its magnetometer has seen enough for that to mean
+                 * anything, so its own calibration status is the gate. Two of three
+                 * rather than three: three needs a deliberate figure-of-eight, and
+                 * refusing a heading until then would leave the badge looking broken
+                 * when it is merely uncalibrated. */
+                s_bno_calib = b.calib;
+                if (b.calib.mag >= 2) {
+                    s_reading.magnetic_deg = compass_wrap360(b.heading_deg);
+                    double sm = compass_lpf_update(&s_lpf, s_reading.magnetic_deg, LPF_ALPHA);
+                    s_reading.heading_deg = compass_true_deg(sm, s_decl_deg);
+                    s_reading.valid = true;
+                    s_samples++;
+                    s_last_sample_us = esp_timer_get_time();
+                } else {
+                    s_reading.valid = false;
+                }
+            }
+            if (++since_refresh >= REFRESH_EVERY) { since_refresh = 0; settings_refresh(); }
+            vTaskDelay(pdMS_TO_TICKS(SAMPLE_MS));
+            continue;
+        }
+
         imu_sample_t s;
         if (!imu_read(&s)) {
             s_errors++;
@@ -372,21 +427,34 @@ void compass_svc_init(settings_t *reg)
     int scl = (int)settings_get_int(reg, "imu_scl_pin");
     int addr = settings_get_bool(reg, "imu_addr_hi") ? IMU_I2C_ADDR_HI : IMU_I2C_ADDR;
 
-    /* The ICM comes up either way. It carries the accelerometer, so without it
-     * there is no tilt compensation and no heading regardless of which part
-     * measures the field. */
+    int src = setting_enum_idx(reg, "mag_source", MAG_SOURCE_CHOICES, 3, MAG_SOURCE_IMU);
+
+    /* The ICM is brought up whatever the source, because it is the accelerometer
+     * for the two field sources and a useful cross-check for the third. It is only
+     * MANDATORY for those two: a BNO055 has its own accelerometer, so a badge with
+     * one fitted and no ICM still has a compass, and refusing to start there would
+     * be an artefact of the order this code grew in. */
     esp_err_t e = imu_init(sda, scl, addr);
     if (e != ESP_OK) {
-        /* No IMU fitted is a normal badge, so this stays a warning and the task
-         * is never started: running=false makes compass_state_from() report OFF.
-         * The pins are named because a wrong pair looks exactly like a dead part. */
+        /* No IMU fitted is a normal badge, so this stays a warning. The pins are
+         * named because a wrong pair looks exactly like a dead part. */
         ESP_LOGW(TAG, "no IMU on sda=%d scl=%d addr=0x%02X: %s",
                  sda, scl, addr, esp_err_to_name(e));
-        return;
+        if (src != MAG_SOURCE_BNO055) return;   /* running=false reports OFF */
     }
+    s_imu_present = (e == ESP_OK);
 
-    int src = setting_enum_idx(reg, "mag_source", MAG_SOURCE_CHOICES, 2, MAG_SOURCE_IMU);
-    if (src == MAG_SOURCE_QMC5883L) {
+    if (src == MAG_SOURCE_BNO055) {
+        if (bno055_init(sda, scl, settings_get_bool(reg, "bno_addr_hi")) == ESP_OK) {
+            s_mag_source = MAG_SOURCE_BNO055;
+        } else if (!s_imu_present) {
+            ESP_LOGW(TAG, "mag_source is bno055, none answered, and no IMU either: no compass");
+            return;
+        } else {
+            ESP_LOGW(TAG, "mag_source is bno055 but none answered: no heading "
+                          "(set mag_source back to imu to use the AK09916)");
+        }
+    } else if (src == MAG_SOURCE_QMC5883L) {
         qmc_range_t range = (qmc_range_t)setting_enum_idx(reg, "qmc_range",
                                                          QMC_RANGE_CHOICES, 2, QMC_RANGE_8G);
         qmc_osr_t osr = (qmc_osr_t)setting_enum_idx(reg, "qmc_osr",
@@ -411,10 +479,13 @@ void compass_svc_init(settings_t *reg)
     compass_lpf_init(&s_lpf);
     s_running = true;
     xTaskCreatePinnedToCore(compass_task, "compass", 3072, NULL, 3, NULL, 1);
-    ESP_LOGI(TAG, "compass on I2C%d sda=%d scl=%d: accel from ICM 0x%02X, field from %s, "
-                  "decl %.1f deg",
-             SAO_I2C_PORT, sda, scl, addr,
-             s_mag_source == MAG_SOURCE_QMC5883L ? "QMC5883L 0x0D" : "AK09916",
+    ESP_LOGI(TAG, "compass on I2C%d sda=%d scl=%d: %s, decl %.1f deg",
+             SAO_I2C_PORT, sda, scl,
+             s_mag_source == MAG_SOURCE_BNO055
+                 ? "heading fused by a BNO055"
+                 : s_mag_source == MAG_SOURCE_QMC5883L
+                     ? "field from a QMC5883L, accel from the ICM"
+                     : "field and accel from the ICM",
              s_decl_deg);
 }
 
@@ -462,6 +533,7 @@ void compass_get_status(compass_status_t *out)
      * the sensor. */
     out->cal_bad = s_cal_bad;
     out->mag_source = s_mag_source;
+    out->bno_calib = s_bno_calib;
     out->selftest_done = s_selftest_done;
     out->selftest = s_selftest;
     out->state = compass_state_from(s_running, out->ms_since_sample,

@@ -170,12 +170,36 @@ fail or the bus wedges.
 uses user banks. The same discipline applies: name the page before touching a register, and leave
 page 0 selected.
 
-### What it would mean for the firmware
+### Using it
 
-The BNO055 does its own fusion, so it does not slot in underneath `util/compass.h` the way a plain
-magnetometer does. It arrives as a third heading source alongside the compass and GPS course, which
-`compass_pick_up()` already arbitrates between, and the calibration sweep in the Compass app would not
-apply to it since it calibrates itself continuously.
+The driver is written and builds; it has not met the part yet. Set `mag_source` to `bno055` and
+restart, plus `bno_addr_hi` if the board straps ADR high for `0x29`.
+
+It is not a field source like the others. It reports a finished heading, so with it selected the
+badge's tilt maths, hard-iron correction, calibration sweep and magnetometer self-test all sit idle and
+only the low-pass is kept. The Compass app says so rather than offering an F1 sweep that could not do
+anything, and the Calibration row reads `self, mag n/3`.
+
+A heading is published once its magnetometer calibration reaches **2 of 3**. The part reports a
+confident-looking bearing from the moment it powers up, long before its magnetometer has seen enough
+for that to mean anything, so its own calibration status is the gate. Two rather than three, because
+three needs a deliberate figure-of-eight and refusing a heading until then leaves the badge looking
+broken when it is merely uncalibrated. Diagnostics shows all four figures.
+
+The driver selects the external crystal and reads the bit back, so a board without one is reported
+rather than silently running on the internal oscillator. It also brings the part up through a reset and
+waits out the bootloader, because reading during that window returns zeroes that look like a working
+part pointing north.
+
+Unlike every other source, a BNO055 does not need the ICM at all: it has its own accelerometer, so a
+badge with one fitted and no ICM still has a compass.
+
+### The axis mapping is not done yet, and belongs in the chip
+
+`AXIS_MAP_CFG_P1` and `AXIS_MAP_SIGN_P1` in `bno055.c` set the part's own frame, currently the
+datasheet default. Fix it there rather than correcting the heading downstream: the fusion then runs in
+the badge's frame and the reported roll and pitch need no correction either. Table 3-24 of the
+datasheet lists the eight standard placements.
 
 ## Others considered
 
