@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "core/settings.h"
+#include "drivers/imu.h"
 #include "util/compass.h"
 
 /* Latest fused heading. Copied out whole, like gps_fix_t. */
@@ -38,7 +39,12 @@ typedef struct {
     uint32_t implausible;      /* samples rejected as not-a-magnetic-field */
     double field_ut;           /* magnitude of the last corrected sample, uT */
     double field_raw_ut;       /* magnitude before the correction, uT */
-    bool cal_bad;              /* raw field is sane, the stored correction is not */
+    bool cal_bad;
+    /* Last magnetometer self-test, valid only while selftest_done is set. The
+     * result is kept rather than recomputed because the test takes 100 ms and
+     * changes the measurement mode, so a page cannot run it on every tick. */
+    bool selftest_done;
+    imu_mag_selftest_t selftest;              /* raw field is sane, the stored correction is not */
     uint32_t ms_since_sample;  /* since the last fused heading; UINT32_MAX if never */
     uint32_t ms_since_tilt;    /* since the last accelerometer-only attitude */
     uint8_t imu_whoami;        /* raw WHO_AM_I, so a dead part is distinguishable */
@@ -60,6 +66,10 @@ void compass_get_status(compass_status_t *out);
 /* Magnetometer calibration. The sweep accumulates in RAM while the user turns
  * the badge through every orientation; saving writes it to NVS and applies it
  * at once, so there is no reboot in the loop. */
+/* Ask the sampling task to run the magnetometer self-test. Returns at once; the
+ * verdict appears in compass_status_t.selftest about 100 ms later. */
+void compass_selftest_begin(void);
+
 void compass_cal_begin(void);
 bool compass_cal_save(void);   /* false while the sweep is not usable yet */
 void compass_cal_cancel(void);

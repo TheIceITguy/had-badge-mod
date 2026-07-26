@@ -1,12 +1,13 @@
 ---
 title: Diagnostics
-description: Live per-module status for the radio, GPS, compass, WiFi, Bluetooth, and system, plus one-press tests for the motor and the LED.
+description: Live per-module status for the radio, GPS, compass, WiFi, Bluetooth, and system, plus one-press tests for the motor, the LED and the magnetometer.
 ---
 
 Diagnostics shows live values that confirm each subsystem is working and the badge is configured the
 way you expect. The rows are grouped under a heading per module, and two of them cannot be read at all,
 only felt or seen: F1 buzzes the vibration motor once and F2 lights the notification LED for a second.
-Both do nothing when the feature is off in Settings.
+Both do nothing when the feature is off in Settings. F3 runs the magnetometer self-test, described
+under Compass below.
 
 ## LoRa mesh
 
@@ -44,6 +45,7 @@ These rows cover the optional ICM-20948 on the SAO header. See
 | Heading | The true heading, the magnetic heading before declination, and the declination itself, for example `276 true  mag 274  dec +2.4`. Only filled in when the State row says `ok` |
 | Tilt | Roll and pitch in degrees from the accelerometer, for example `roll -3  pitch 12` |
 | Data | The sensor identity, the driver's I2C counters, then the fused ones, for example `id EA  1840 rd, 0 e  1840 smp, 0s` |
+| Self-test | The last magnetometer self-test verdict, blank until F3 is pressed |
 
 The State row names the cause rather than the symptom, because the fixes have nothing in common:
 `disabled` means `imu_enabled` is off, so the driver was never started. `no IMU on SAO` means the
@@ -73,6 +75,33 @@ It walks the signal path from the bus to the published heading, so read it left 
 So a valid `id EA` with `rd` climbing, `e` climbing and `smp` stuck at 0 is a magnetometer die that is
 not soldered down, while `e` climbing along with `rd` stuck is an I2C wiring problem on the main bus.
 The row shows `--` when `imu_enabled` is off, since there is nothing to count.
+
+### The Self-test row, and why it outranks the others
+
+Every other compass row can only see what the sensor reports, so none of them can tell a broken
+magnetometer from a magnetic desk. F3 settles that. The AK09916 can measure a field produced by a
+coil on its own die, so a healthy part returns nearly the same counts wherever the badge happens to
+be, and the expected windows come from the datasheet: X and Y within +/-200 counts, Z between -1000
+and -200.
+
+The row is blank until you press F3, because a verdict left over from a different module would be
+worse than none. After that it reads `PASS` or `FAIL`, then how many of the five repeats landed
+inside the windows, then the last set of counts:
+
+```
+Self-test  PASS  5/5  -38  91  -604
+Self-test  FAIL  1/5  3975  3302  -11531
+```
+
+All five repeats have to pass. A part that passes one or two is not a working magnetometer having
+bad luck, it is one returning numbers that occasionally land inside the window by chance, and the
+counts printed alongside make the difference obvious.
+
+A PASS puts the fault outside the sensor: something magnetic nearby, or a calibration that needs
+redoing. A FAIL means the die is not measuring, and calibration cannot help. Counterfeit modules and
+dead magnetometer dies are common at the low-cost end of the ICM-20948 market, and the
+accelerometer and gyroscope on the other die in the same package usually keep working, which is why
+the Tilt row above stays alive.
 
 ## WiFi
 

@@ -71,6 +71,18 @@ with no compass heading, the Source row falls back to GPS course over ground.
 F1 is unlabelled and does nothing when there is no magnetometer answering, because there would be
 nothing to calibrate.
 
+## Judging the sensor itself
+
+Calibration cannot fix a magnetometer that is not measuring, and the two faults look identical from
+this page: both give a heading that will not settle. F3 in the Diagnostics app tells them apart. It
+runs the AK09916 self-test, which measures a field produced by a coil on the sensor's own die, so
+the expected counts are fixed by the datasheet and owe nothing to the room. Everything else that
+breaks a heading leaves that test passing.
+
+Run it before sweeping again if the heading is unstable. See
+[Troubleshooting](/had-badge-mod/development/troubleshooting/#the-heading-jumps-constantly-even-after-a-calibration-sweep)
+for how to read the result.
+
 ## The magnetometer must be calibrated before any heading is published
 
 An uncorrected magnetometer can read tens of degrees out, from the badge's own metal and from

@@ -70,6 +70,13 @@ static uint32_t s_samples, s_errors;
  * what turns that from "the compass is jittery" into a named fault. */
 static uint32_t s_implausible;
 static double s_field_ut, s_field_raw_ut;
+
+/* Magnetometer self-test, run on request by the task that owns imu_read(). The
+ * die measures a coil on its own substrate, so this is the only check that
+ * separates a broken sensor from a magnetic desk, a bad SAO joint or a stale
+ * calibration -- all four produce the same spinning heading. */
+static volatile bool s_selftest_req, s_selftest_done;
+static imu_mag_selftest_t s_selftest;
 static volatile bool s_cal_bad;
 static int64_t s_bad_log_us;
 static volatile bool s_field_bad;
@@ -185,6 +192,17 @@ static void compass_task(void *arg)
     (void)arg;
     int since_refresh = 0;
     while (s_running) {
+        /* The self-test changes the measurement mode, so it has to run in the task
+         * that owns imu_read() rather than straight from the key handler. The
+         * request is a single bool set by another task and cleared here, which
+         * needs no lock: a request that lands during this check is served on the
+         * next pass 50 ms later. */
+        if (s_selftest_req) {
+            s_selftest_req = false;
+            imu_mag_selftest(&s_selftest);
+            s_selftest_done = true;
+        }
+
         imu_sample_t s;
         if (!imu_read(&s)) {
             s_errors++;
@@ -361,11 +379,19 @@ void compass_get_status(compass_status_t *out)
      * so the state says UNCAL and the UI asks for a sweep, rather than accusing
      * the sensor. */
     out->cal_bad = s_cal_bad;
+    out->selftest_done = s_selftest_done;
+    out->selftest = s_selftest;
     out->state = compass_state_from(s_running, out->ms_since_sample,
                                     out->reading.calibrated && !s_cal_bad, s_field_bad);
 }
 
 /* --- calibration ---------------------------------------------------------- */
+
+void compass_selftest_begin(void)
+{
+    s_selftest_done = false;
+    s_selftest_req = true;
+}
 
 void compass_cal_begin(void)
 {

@@ -29,7 +29,7 @@
 enum {
     R_NODE, R_RADIO, R_CHAN, R_RXTX, R_HEARD, R_SIG, R_PEERS,
     R_GPS, R_GPS_POS, R_GPS_DATA,
-    R_CMP, R_CMP_HDG, R_CMP_TILT, R_CMP_DATA,
+    R_CMP, R_CMP_HDG, R_CMP_TILT, R_CMP_DATA, R_CMP_ST,
     R_WIFI, R_WIFI_IP,
     R_BLE,
     R_BATT, R_SYS,
@@ -95,6 +95,7 @@ static void build(lv_obj_t **screen, lv_group_t *group)
     s_val[R_CMP_HDG]  = make_row(f.body, "Heading");
     s_val[R_CMP_TILT] = make_row(f.body, "Tilt");
     s_val[R_CMP_DATA] = make_row(f.body, "Data");
+    s_val[R_CMP_ST]   = make_row(f.body, "Self-test");
 
     make_header(f.body, "WIFI");
     s_val[R_WIFI]    = make_row(f.body, "State");
@@ -108,7 +109,7 @@ static void build(lv_obj_t **screen, lv_group_t *group)
     s_val[R_SYS]  = make_row(f.body, "Up/Heap");
 
     *screen = f.screen;
-    menubar_set_labels("Buzz", "LED", "", "", "");
+    menubar_set_labels("Buzz", "LED", "MagST", "", "");
 }
 
 static void tick(void)
@@ -257,6 +258,29 @@ static void tick(void)
         lv_label_set_text(s_val[R_CMP_DATA], b);
     }
 
+    /* The self-test measures a coil on the magnetometer's own die, so its verdict
+     * is independent of the room, the wiring and the calibration. That makes it
+     * the row to read first when a heading misbehaves: every other explanation
+     * leaves this passing. Blank until F3 has been pressed, because a stale
+     * verdict from a previous module would be worse than none. */
+    if (!cst.mag_present) {
+        lv_label_set_text(s_val[R_CMP_ST], "--");
+    } else if (!cst.selftest_done) {
+        lv_label_set_text(s_val[R_CMP_ST], "press F3");
+    } else if (!cst.selftest.ran) {
+        lv_label_set_text(s_val[R_CMP_ST], "did not run (I2C)");
+    } else {
+        /* The counts are shown either way: a FAIL that is wildly out means a dead
+         * die, and one just outside the window means a marginal part. */
+        snprintf(b, sizeof b, "%s  %d/%d  %d %d %d",
+                 cst.selftest.pass ? "PASS" : "FAIL",
+                 cst.selftest.passes, cst.selftest.runs,
+                 cst.selftest.x, cst.selftest.y, cst.selftest.z);
+        lv_label_set_text(s_val[R_CMP_ST], b);
+        lv_obj_set_style_text_color(s_val[R_CMP_ST],
+                                    theme_hex(cst.selftest.pass ? C_OK : C_CRIT), 0);
+    }
+
     /* --- WiFi --- */
     char st[24]; int wr = 0; bool wrv = false;
     wifi_get_state(st, sizeof st, &wr, &wrv);
@@ -292,6 +316,10 @@ static void on_fkey(int n)
 {
     if (n == 1) vibe_svc_test();
     else if (n == 2) led_svc_test();
+    /* F3 is the one compass check that does not depend on where the badge is
+     * standing, so it answers the question the other rows cannot: is the sensor
+     * broken, or is the room? */
+    else if (n == 3) compass_selftest_begin();
 }
 
 const app_def_t *app_diag(void)

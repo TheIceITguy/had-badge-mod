@@ -41,4 +41,24 @@ bool imu_read(imu_sample_t *out);
 /* Status snapshot (always succeeds; present=false when no IMU was found). */
 void imu_get_status(imu_status_t *out);
 
+/* --- Magnetometer self-test ------------------------------------------------
+ * The AK09916 measures a field produced by a coil on its own die, so a healthy
+ * part returns nearly the same counts wherever the badge is. Everything else
+ * that can break a heading -- a magnet nearby, steel in the desk, SAO wiring, a
+ * stale calibration -- leaves this test passing, so a FAIL is the one result
+ * that points at the sensor itself rather than at the user's surroundings. */
+typedef struct {
+    bool ran;         /* the sequence completed; false means a transport failure */
+    bool pass;        /* every repeat landed inside the datasheet windows */
+    bool id_ok;       /* the die still identified itself after the reset */
+    int runs, passes; /* repeats attempted and repeats that passed */
+    int16_t x, y, z;  /* the last repeat, in counts (the windows are in counts) */
+} imu_mag_selftest_t;
+
+/* Run it. Takes about 100 ms and leaves the magnetometer back in continuous
+ * mode. Not thread-safe against imu_read(): it changes the measurement mode, so
+ * the task that owns imu_read() has to be the one that calls it. Returns
+ * out->ran. */
+bool imu_mag_selftest(imu_mag_selftest_t *out);
+
 #endif /* DRIVERS_IMU_H */
