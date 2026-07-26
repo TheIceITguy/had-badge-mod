@@ -150,6 +150,12 @@ into the shadow registers. That exercises the register map, the user-bank switch
 and the self-test against the real part. The accelerometer reads a steady 1.0 g, so roll and pitch are
 good.
 
+A second magnetometer is being evaluated because of that, since the AK09916 has no oversampling
+control and therefore no way to filter a disturbance faster than its sample rate. See
+[Magnetometer options](/had-badge-mod/hardware/magnetometer-options/) for the candidates, the
+identification traps on the cheap boards, and why the ICM stays fitted for its accelerometer either
+way.
+
 The magnetometer is not yet trustworthy on the test badge. Readings carry roughly 200 to 400 uT of
 spread on every axis when the part is stationary, against an earth field of 25 to 65 uT, so the
 firmware suppresses the heading rather than publishing a bearing derived from it. Eliminated by

@@ -33,6 +33,7 @@ export default defineConfig({
           items: [
             { label: 'Board and pins', link: '/hardware/overview/' },
             { label: 'Compass and IMU', link: '/hardware/compass/' },
+            { label: 'Magnetometer options', link: '/hardware/magnetometer-options/' },
             { label: 'GPS module', link: '/hardware/gps/' },
             { label: 'Vibration motor and LED', link: '/hardware/vibration-and-led/' },
             { label: 'Internal addon board', link: '/hardware/internal-addon-board/' },
