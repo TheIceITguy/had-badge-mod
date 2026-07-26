@@ -78,6 +78,7 @@ export default defineConfig({
             { label: 'Conventions', link: '/development/conventions/' },
             { label: 'Offline maps', link: '/development/maps/' },
             { label: 'Troubleshooting', link: '/development/troubleshooting/' },
+            { label: 'Compass handoff', link: '/development/compass-handoff/' },
           ],
         },
       ],

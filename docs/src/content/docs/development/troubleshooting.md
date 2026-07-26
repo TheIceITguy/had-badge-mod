@@ -136,7 +136,9 @@ reports roll and pitch.
 
 ### The heading is suppressed and the raw field reads in the hundreds of uT
 
-This is the state of the test badge, and it is not yet solved. The magnetometer answers over the
+This is the state of the test badge, and it is not yet solved.
+[Compass handoff](/had-badge-mod/development/compass-handoff/) is the full account, including what to
+do when a replacement module arrives; the short version follows. The magnetometer answers over the
 auxiliary master, resets, configures and streams, and its self-test shows a real coil response, but a
 stationary part reads with 200 to 400 uT of spread on every axis when the earth's field is 25 to
 65 uT. The firmware refuses to turn that into a bearing.
